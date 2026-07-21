@@ -1,0 +1,313 @@
+.admin-prize-orders {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+}
+
+.admin-prize-orders-header {
+  align-items: flex-end;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 1.25rem 0 1.5rem;
+}
+
+.admin-prize-orders-header h1 {
+  color: var(--dark-purple);
+  font-size: clamp(2rem, 4vw, 3rem);
+  margin: 0 0 0.45rem;
+}
+
+.admin-prize-orders-header p {
+  color: var(--text-light);
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+.admin-order-panel {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(82, 54, 106, 0.08);
+  padding: 1.5rem;
+}
+
+.admin-order-filters {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: minmax(220px, 1fr) 170px 170px auto;
+  margin-bottom: 1.25rem;
+}
+
+.admin-order-filters input,
+.admin-order-filters select {
+  border: 1px solid #dccbe8;
+  border-radius: 8px;
+  color: var(--text-dark);
+  font-size: 1rem;
+  min-width: 0;
+  padding: 0.8rem 0.9rem;
+}
+
+.admin-order-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.admin-order-row {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #eadff0;
+  border-radius: 8px;
+  color: var(--text-dark);
+  cursor: pointer;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(220px, 1.25fr) minmax(220px, 1.35fr) 160px 170px;
+  padding: 1rem;
+  text-align: left;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.admin-order-row:hover {
+  border-color: var(--primary-purple);
+  box-shadow: 0 8px 22px rgba(155, 89, 182, 0.12);
+  transform: translateY(-1px);
+}
+
+.admin-order-row > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.admin-order-row strong,
+.admin-order-row span {
+  overflow-wrap: anywhere;
+}
+
+.admin-order-row span,
+.admin-order-row time {
+  color: var(--text-light);
+  font-size: 0.92rem;
+}
+
+.admin-order-row time {
+  text-align: right;
+}
+
+.status-pill.mixed {
+  background: #eee7ff;
+  color: #6a39a3;
+}
+
+.status-pill.empty {
+  background: #eef2f5;
+  color: #60717a;
+}
+
+.admin-order-modal {
+  align-items: center;
+  background: rgba(22, 16, 28, 0.72);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 1.25rem;
+  position: fixed;
+  z-index: 2200;
+}
+
+.admin-order-modal-content {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 18px 50px rgba(22, 16, 28, 0.28);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-height: min(92vh, 860px);
+  overflow-y: auto;
+  padding: 1.5rem;
+  position: relative;
+  width: min(96vw, 980px);
+}
+
+.admin-order-close {
+  align-items: center;
+  background: transparent;
+  border: none;
+  color: #6f7f85;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 2rem;
+  height: 44px;
+  justify-content: center;
+  line-height: 1;
+  position: absolute;
+  right: 1rem;
+  top: 1rem;
+  width: 44px;
+}
+
+.admin-order-detail-header {
+  align-items: flex-start;
+  border-bottom: 1px solid #eadff0;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0 3.25rem 1rem 0;
+}
+
+.admin-order-detail-header p,
+.admin-order-detail-header h2,
+.admin-order-detail-header span {
+  margin: 0;
+}
+
+.admin-order-detail-header p {
+  color: var(--primary-purple);
+  font-weight: 800;
+}
+
+.admin-order-detail-header h2 {
+  color: var(--dark-purple);
+  margin: 0.25rem 0;
+}
+
+.admin-order-detail-header span,
+.admin-order-item span,
+.admin-order-item p,
+.admin-order-address p {
+  color: var(--text-light);
+}
+
+.admin-order-detail-status {
+  align-items: flex-end;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
+.admin-order-address {
+  align-items: center;
+  background: #faf7fc;
+  border: 1px solid #eadff0;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.admin-order-address.virtual {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.admin-order-address h3,
+.admin-order-address p,
+.admin-order-items h3 {
+  margin: 0;
+}
+
+.admin-order-address p {
+  margin-top: 0.35rem;
+  overflow-wrap: anywhere;
+}
+
+.admin-order-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.admin-order-item {
+  border: 1px solid #eadff0;
+  border-radius: 8px;
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: 78px minmax(0, 1fr) auto;
+  padding: 0.9rem;
+}
+
+.admin-order-item img {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  object-fit: cover;
+  width: 78px;
+}
+
+.admin-order-item > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.admin-order-item strong,
+.admin-order-item span,
+.admin-order-item p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-order-item-actions {
+  align-items: flex-end;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.admin-order-item-actions button {
+  background: #f3eef7;
+  border: none;
+  border-radius: 8px;
+  color: var(--dark-purple);
+  cursor: pointer;
+  font-weight: 800;
+  padding: 0.45rem 0.75rem;
+}
+
+.admin-order-detail-actions {
+  border-top: 1px solid #eadff0;
+  display: flex;
+  gap: 0.8rem;
+  justify-content: flex-end;
+  padding-top: 1rem;
+}
+
+@media (max-width: 900px) {
+  .admin-order-filters,
+  .admin-order-row {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-order-row time {
+    text-align: left;
+  }
+
+  .admin-order-detail-header,
+  .admin-order-address,
+  .admin-order-detail-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-order-detail-status {
+    align-items: flex-start;
+  }
+
+  .admin-order-item {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .admin-order-item img {
+    width: 64px;
+  }
+
+  .admin-order-item-actions {
+    align-items: flex-start;
+    grid-column: 1 / -1;
+  }
+}
