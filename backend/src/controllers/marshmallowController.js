@@ -2,11 +2,15 @@ const db = require('../config/database');
 const crypto = require('crypto');
 const { verifyCaptcha } = require('../utils/aliyunCaptcha');
 const { sendMarshmallowNotificationEmail } = require('../utils/emailService');
+const { idList, positiveInt, stringValue } = require('../utils/validation');
 
 // Create a new marshmallow
 exports.createMarshmallow = async (req, res) => {
   try {
     const { title, sender_alias, content, captchaVerifyParam } = req.body;
+    const safeTitle = stringValue(title, { field: 'Title', max: 200 });
+    const safeSenderAlias = stringValue(sender_alias, { field: 'Sender alias', max: 100 }) || '匿名的猪小娜';
+    const safeContent = stringValue(content, { field: 'Content', required: true, max: 10000 });
     // Optional auth: req.userId might be set if optionalAuth middleware is used
     const userId = req.userId || null;
     const uuid = crypto.randomUUID();
@@ -19,20 +23,16 @@ exports.createMarshmallow = async (req, res) => {
       }
     }
 
-    if (!content) {
-      return res.status(400).json({ message: 'Content is required' });
-    }
-
     const [result] = await db.query(
       'INSERT INTO marshmallows (uuid, title, sender_alias, content, user_id) VALUES (?, ?, ?, ?, ?)',
-      [uuid, title || null, sender_alias || '匿名的猪小娜', content, userId]
+      [uuid, safeTitle || null, safeSenderAlias, safeContent, userId]
     );
 
     try {
       await sendMarshmallowNotificationEmail({
-        sender: sender_alias || '匿名的猪小娜',
-        title: title || '无标题棉花糖',
-        content
+        sender: safeSenderAlias,
+        title: safeTitle || '无标题棉花糖',
+        content: safeContent
       });
     } catch (emailError) {
       console.error('发送棉花糖提醒邮件失败:', emailError);
@@ -44,7 +44,7 @@ exports.createMarshmallow = async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating marshmallow:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(error.status || 500).json({ message: error.status ? error.message : 'Server error' });
   }
 };
 
@@ -61,7 +61,7 @@ exports.getMyMarshmallows = async (req, res) => {
     res.json(marshmallows);
   } catch (error) {
     console.error('Error fetching user marshmallows:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(error.status || 500).json({ message: error.status ? error.message : 'Server error' });
   }
 };
 
@@ -71,7 +71,7 @@ exports.bindMarshmallow = async (req, res) => {
     const { marshmallowId } = req.body;
     const userId = req.userId;
 
-    if (!marshmallowId) {
+    if (!/^[0-9a-f-]{36}$/i.test(String(marshmallowId || ''))) {
       return res.status(400).json({ message: 'Marshmallow ID is required' });
     }
 
@@ -98,17 +98,13 @@ exports.bindMarshmallow = async (req, res) => {
     res.json({ message: 'Marshmallow bound successfully' });
   } catch (error) {
     console.error('Error binding marshmallow:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(error.status || 500).json({ message: error.status ? error.message : 'Server error' });
   }
 };
 
 // Admin: Get all marshmallows
 exports.getAllMarshmallows = async (req, res) => {
   try {
-    if (req.userRole !== 'admin') {
-      return res.status(403).json({ message: 'Access denied' });
-    }
-
     const userId = req.userId;
 
     const [marshmallows] = await db.query(
@@ -123,18 +119,14 @@ exports.getAllMarshmallows = async (req, res) => {
     res.json(marshmallows);
   } catch (error) {
     console.error('Error fetching all marshmallows:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(error.status || 500).json({ message: error.status ? error.message : 'Server error' });
   }
 };
 
 // Admin: Mark marshmallow as read
 exports.markAsRead = async (req, res) => {
   try {
-    if (req.userRole !== 'admin') {
-      return res.status(403).json({ message: 'Access denied' });
-    }
-
-    const { id } = req.params;
+    const id = positiveInt(req.params.id, { field: 'Marshmallow ID' });
     const userId = req.userId;
 
     await db.query(
@@ -145,22 +137,14 @@ exports.markAsRead = async (req, res) => {
     res.json({ message: 'Marked as read' });
   } catch (error) {
     console.error('Error marking marshmallow as read:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(error.status || 500).json({ message: error.status ? error.message : 'Server error' });
   }
 };
 
 // Admin: Delete marshmallows (batch)
 exports.deleteMarshmallows = async (req, res) => {
   try {
-    if (req.userRole !== 'admin') {
-      return res.status(403).json({ message: 'Access denied' });
-    }
-
-    const { ids } = req.body;
-
-    if (!ids || !Array.isArray(ids) || ids.length === 0) {
-      return res.status(400).json({ message: 'No IDs provided' });
-    }
+    const ids = idList(req.body.ids, { field: 'Marshmallow IDs', max: 100 });
 
     await db.query(
       'DELETE FROM marshmallows WHERE id IN (?)',
@@ -170,32 +154,24 @@ exports.deleteMarshmallows = async (req, res) => {
     res.json({ message: 'Marshmallows deleted successfully' });
   } catch (error) {
     console.error('Error deleting marshmallows:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(error.status || 500).json({ message: error.status ? error.message : 'Server error' });
   }
 };
 
 // Admin: Reply to a marshmallow
 exports.replyMarshmallow = async (req, res) => {
   try {
-    if (req.userRole !== 'admin') {
-      return res.status(403).json({ message: 'Access denied' });
-    }
-
-    const { id } = req.params;
-    const { reply_content } = req.body;
-
-    if (!reply_content) {
-      return res.status(400).json({ message: 'Reply content is required' });
-    }
+    const id = positiveInt(req.params.id, { field: 'Marshmallow ID' });
+    const replyContent = stringValue(req.body.reply_content, { field: 'Reply content', required: true, max: 10000 });
 
     await db.query(
       'UPDATE marshmallows SET reply_content = ?, reply_at = NOW(), is_read = FALSE WHERE id = ?',
-      [reply_content, id]
+      [replyContent, id]
     );
 
     res.json({ message: 'Reply sent successfully' });
   } catch (error) {
     console.error('Error replying to marshmallow:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(error.status || 500).json({ message: error.status ? error.message : 'Server error' });
   }
 };

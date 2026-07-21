@@ -6,6 +6,7 @@
 const Captcha20230305 = require('@alicloud/captcha20230305');
 const OpenApi = require('@alicloud/openapi-client');
 const Util = require('@alicloud/tea-util');
+const { isCaptchaEnabled } = require('./optionalFeatures');
 
 // 创建客户端
 function createClient() {
@@ -27,8 +28,8 @@ function createClient() {
  * @returns {Promise<{success: boolean, code: string, message: string}>}
  */
 async function verifyCaptcha(captchaVerifyParam, sceneId = null) {
-  // 如果未配置验证码，跳过验证（开发环境）
-  if (!process.env.ALIYUN_ACCESS_KEY_ID || !process.env.ALIYUN_ACCESS_KEY_SECRET) {
+  // 任一必需配置缺失时，整个验证码功能视为未启用。
+  if (!isCaptchaEnabled()) {
     console.warn('[Captcha] 阿里云验证码未配置，跳过验证');
     return { success: true, code: 'SKIP', message: '验证码未配置，已跳过' };
   }

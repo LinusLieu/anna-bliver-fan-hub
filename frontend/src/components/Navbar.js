@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authService } from '../services';
 import { useSiteSettings } from '../context/SiteSettingsContext';
+import BrandMark from './BrandMark';
 
 function Navbar() {
   const navigate = useNavigate();
@@ -37,7 +38,7 @@ function Navbar() {
       <div className="navbar-container">
         <div className="navbar-header">
           <Link to="/" className="navbar-brand" onClick={closeMenu} aria-label={siteSettings.siteTitle}>
-            <img src={siteSettings.navbarLogoUrl} alt={siteSettings.siteTitle} className="navbar-logo" />
+            <BrandMark settings={siteSettings} />
           </Link>
           <button className="menu-icon" type="button" aria-label="切换导航" aria-expanded={isMenuOpen} onClick={() => setIsMenuOpen((open) => !open)}>
             <span className={isMenuOpen ? 'bar open' : 'bar'} />

@@ -1,20 +1,26 @@
 const tencentcloud = require('tencentcloud-sdk-nodejs');
+const {
+  isEmailVerificationEnabled,
+  isRedemptionEmailEnabled,
+  isMarshmallowEmailEnabled
+} = require('./optionalFeatures');
 
 const SesClient = tencentcloud.ses.v20201002.Client;
 
-// 初始化客户端
-const client = new SesClient({
-  credential: {
-    secretId: process.env.TENCENT_SECRET_ID,
-    secretKey: process.env.TENCENT_SECRET_KEY,
-  },
-  region: 'ap-guangzhou',
-  profile: {
-    httpProfile: {
-      endpoint: 'ses.tencentcloudapi.com',
+function createClient() {
+  return new SesClient({
+    credential: {
+      secretId: process.env.TENCENT_SECRET_ID,
+      secretKey: process.env.TENCENT_SECRET_KEY,
     },
-  },
-});
+    region: 'ap-guangzhou',
+    profile: {
+      httpProfile: {
+        endpoint: 'ses.tencentcloudapi.com',
+      },
+    },
+  });
+}
 
 /**
  * 发送验证码邮件
@@ -24,6 +30,11 @@ const client = new SesClient({
  * @returns {Promise}
  */
 async function sendVerificationEmail(toEmail, name, code) {
+  if (!isEmailVerificationEnabled()) {
+    console.warn('[Email] Verification email skipped: Tencent SES verification is not fully configured');
+    return { success: false, skipped: true };
+  }
+
   // 发件人格式: "显示名称" <邮箱地址>
   const fromName = process.env.SES_FROM_NAME || '小猪anna的秘密基地';
   const fromEmail = process.env.SES_FROM_EMAIL;
@@ -33,14 +44,14 @@ async function sendVerificationEmail(toEmail, name, code) {
     FromEmailAddress: fromAddress,
     Destination: [toEmail],
     Template: {
-      TemplateID: parseInt(process.env.SES_TEMPLATE_ID),
+      TemplateID: parseInt(process.env.SES_TEMPLATE_ID, 10),
       TemplateData: JSON.stringify({ name, code }),
     },
     Subject: '邮箱验证码',
   };
 
   try {
-    const result = await client.SendEmail(params);
+    const result = await createClient().SendEmail(params);
     console.log('Email sent successfully:', result);
     return { success: true, result };
   } catch (error) {
@@ -59,8 +70,8 @@ async function sendRedemptionNotificationEmail(userName, prizeName) {
   const toEmail = process.env.SES_REDEMPTION_TO_EMAIL;
   const templateId = process.env.SES_REDEMPTION_TEMPLATE_ID;
 
-  if (!toEmail || !templateId) {
-    console.warn('[Email] Redemption notification skipped: SES_REDEMPTION_TO_EMAIL or SES_REDEMPTION_TEMPLATE_ID is not configured');
+  if (!isRedemptionEmailEnabled()) {
+    console.warn('[Email] Redemption notification skipped: Tencent SES redemption notification is not fully configured');
     return { success: false, skipped: true };
   }
 
@@ -82,7 +93,7 @@ async function sendRedemptionNotificationEmail(userName, prizeName) {
   };
 
   try {
-    const result = await client.SendEmail(params);
+    const result = await createClient().SendEmail(params);
     console.log('Redemption notification email sent successfully:', result);
     return { success: true, result };
   } catch (error) {
@@ -103,8 +114,8 @@ async function sendMarshmallowNotificationEmail({ sender, title, content }) {
   const toEmail = process.env.SES_MARSHMALLOW_TO_EMAIL;
   const templateId = process.env.SES_MARSHMALLOW_TEMPLATE_ID;
 
-  if (!toEmail || !templateId) {
-    console.warn('[Email] Marshmallow notification skipped: SES_MARSHMALLOW_TO_EMAIL or SES_MARSHMALLOW_TEMPLATE_ID is not configured');
+  if (!isMarshmallowEmailEnabled()) {
+    console.warn('[Email] Marshmallow notification skipped: Tencent SES marshmallow notification is not fully configured');
     return { success: false, skipped: true };
   }
 
@@ -127,7 +138,7 @@ async function sendMarshmallowNotificationEmail({ sender, title, content }) {
   };
 
   try {
-    const result = await client.SendEmail(params);
+    const result = await createClient().SendEmail(params);
     console.log('Marshmallow notification email sent successfully:', result);
     return { success: true, result };
   } catch (error) {

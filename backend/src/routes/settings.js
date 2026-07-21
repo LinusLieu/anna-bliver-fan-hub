@@ -2,11 +2,14 @@ const express = require('express');
 const router = express.Router();
 const settingsController = require('../controllers/settingsController');
 const authMiddleware = require('../middleware/auth');
+const { requirePermission, PERMISSIONS } = require('../middleware/permissions');
+const asyncHandler = require('../utils/asyncHandler');
 
 router.get('/captcha', settingsController.getCaptchaConfig);
-router.get('/registration', settingsController.getRegistrationStatus);
-router.get('/site', settingsController.getSiteConfig);
-router.put('/registration', authMiddleware, settingsController.updateRegistrationStatus);
-router.put('/site', authMiddleware, settingsController.updateSiteConfig);
+router.get('/registration', asyncHandler(settingsController.getRegistrationStatus));
+router.get('/site', asyncHandler(settingsController.getSiteConfig));
+router.put('/registration', authMiddleware, requirePermission(PERMISSIONS.SITE_CONFIG_MANAGE), asyncHandler(settingsController.updateRegistrationStatus));
+router.put('/site', authMiddleware, requirePermission(PERMISSIONS.SITE_CONFIG_MANAGE), asyncHandler(settingsController.updateSiteConfig));
+router.post('/site/logo', authMiddleware, requirePermission(PERMISSIONS.SITE_CONFIG_MANAGE), asyncHandler(settingsController.uploadNavbarLogo));
 
 module.exports = router;

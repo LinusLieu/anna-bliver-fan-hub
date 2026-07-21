@@ -1,19 +1,29 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('node:crypto');
 const db = require('../config/database');
 const { sendVerificationEmail } = require('../utils/emailService');
 const { verifyCaptcha } = require('../utils/aliyunCaptcha');
+const { isEmailVerificationEnabled } = require('../utils/optionalFeatures');
 const pointsService = require('../services/pointsService');
+const { positiveInt } = require('../utils/validation');
 
 // 生成6位随机验证码
 function generateVerificationCode() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return crypto.randomInt(100000, 1000000).toString();
 }
 
 // 发送邮箱验证码
 exports.sendVerificationCode = async (req, res) => {
   try {
     const { email, username, captchaVerifyParam } = req.body;
+
+    if (!isEmailVerificationEnabled()) {
+      return res.status(404).json({
+        message: '邮箱验证未启用',
+        emailVerificationEnabled: false
+      });
+    }
 
     // 验证阿里云验证码
     const captchaResult = await verifyCaptcha(captchaVerifyParam, process.env.ALIYUN_CAPTCHA_SCENE_ID);
@@ -78,8 +88,8 @@ exports.sendVerificationCode = async (req, res) => {
 
 
 exports.register = async (req, res) => {
+  let connection;
   try {
-    // Check if registration is open
     const [settings] = await db.query(
       'SELECT setting_value FROM settings WHERE setting_key = ?',
       ['registration_open']
@@ -91,22 +101,13 @@ exports.register = async (req, res) => {
       return res.status(403).json({ message: 'Registration is currently closed' });
     }
 
-    const { username, email, password, verificationCode } = req.body;
+    const { username, email, password, verificationCode, captchaVerifyParam } = req.body;
+    const emailVerificationEnabled = isEmailVerificationEnabled();
 
-    if (!username || !email || !password || !verificationCode) {
+    if (!username || !email || !password || (emailVerificationEnabled && !verificationCode)) {
       return res.status(400).json({ message: '所有字段都是必填的' });
     }
 
-    // 验证邮箱验证码
-    const [validCode] = await db.query(
-      'SELECT id FROM email_verification_codes WHERE email = ? AND code = ? AND used = FALSE AND expires_at > NOW()',
-      [email, verificationCode]
-    );
-    if (validCode.length === 0) {
-      return res.status(400).json({ message: '验证码无效或已过期' });
-    }
-
-    // 验证邮箱格式
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({ message: '请输入有效的邮箱地址' });
@@ -121,9 +122,9 @@ exports.register = async (req, res) => {
       return res.status(400).json({ message: '用户名只能包含字母、数字、下划线和中文' });
     }
 
-    // 验证密码：6-32个字符，至少包含两种字符类型
-    if (password.length < 6 || password.length > 32) {
-      return res.status(400).json({ message: '密码长度需要在6-32个字符之间' });
+    // 验证密码：10-64个字符，至少包含两种字符类型
+    if (password.length < 10 || password.length > 64) {
+      return res.status(400).json({ message: '密码长度需要在10-64个字符之间' });
     }
     let typeCount = 0;
     if (/[a-zA-Z]/.test(password)) typeCount++;
@@ -133,47 +134,64 @@ exports.register = async (req, res) => {
       return res.status(400).json({ message: '密码需要包含字母、数字、特殊符号中的至少两种' });
     }
 
-    // Check if user already exists
-    const [existingEmail] = await db.query(
-      'SELECT id FROM users WHERE email = ?',
-      [email]
-    );
-
-    if (existingEmail.length > 0) {
-      return res.status(409).json({ message: 'Email already registered' });
+    if (!emailVerificationEnabled) {
+      const captchaResult = await verifyCaptcha(captchaVerifyParam, process.env.ALIYUN_CAPTCHA_SCENE_ID);
+      if (!captchaResult.success) {
+        return res.status(400).json({ message: `验证码校验失败: ${captchaResult.message}`, captchaFailed: true });
+      }
     }
 
-    const [existingUsername] = await db.query(
-      'SELECT id FROM users WHERE username = ?',
-      [username]
-    );
+    const hashedPassword = await bcrypt.hash(password, 12);
+    connection = await db.getConnection();
+    await connection.beginTransaction();
 
-    if (existingUsername.length > 0) {
+    let validCodeId = null;
+    if (emailVerificationEnabled) {
+      const [validCodes] = await connection.query(
+        'SELECT id FROM email_verification_codes WHERE email = ? AND code = ? AND used = FALSE AND expires_at > NOW() ORDER BY id DESC LIMIT 1 FOR UPDATE',
+        [email, verificationCode]
+      );
+      if (!validCodes.length) {
+        await connection.rollback();
+        return res.status(400).json({ message: '验证码无效或已过期' });
+      }
+      validCodeId = validCodes[0].id;
+    }
+
+    const [existing] = await connection.query(
+      'SELECT email, username FROM users WHERE email = ? OR username = ? FOR UPDATE',
+      [email, username]
+    );
+    if (existing.some((row) => row.email === email)) {
+      await connection.rollback();
+      return res.status(409).json({ message: 'Email already registered' });
+    }
+    if (existing.some((row) => row.username === username)) {
+      await connection.rollback();
       return res.status(409).json({ message: 'Username already taken' });
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create user
-    const [result] = await db.query(
+    const [result] = await connection.query(
       'INSERT INTO users (username, email, password) VALUES (?, ?, ?)',
       [username, email, hashedPassword]
     );
 
-    // 将验证码标记为已使用
-    await db.query(
-      'UPDATE email_verification_codes SET used = TRUE WHERE email = ? AND code = ?',
-      [email, verificationCode]
-    );
+    if (validCodeId) {
+      await connection.query('UPDATE email_verification_codes SET used = TRUE WHERE id = ?', [validCodeId]);
+    }
+    await connection.commit();
 
     res.status(201).json({
       message: 'User registered successfully',
       userId: result.insertId
     });
   } catch (error) {
+    if (connection) await connection.rollback().catch(() => {});
     console.error('Register error:', error);
+    if (error.code === 'ER_DUP_ENTRY') return res.status(409).json({ message: 'Email or username already registered' });
     res.status(500).json({ message: 'Server error' });
+  } finally {
+    connection?.release();
   }
 };
 
@@ -220,7 +238,7 @@ exports.login = async (req, res) => {
     const token = jwt.sign(
       { userId: user.id, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
     );
 
     const pointBalances = await pointsService.getUserPointBalances(user.id);
@@ -311,9 +329,10 @@ exports.getAllUsers = async (req, res) => {
 };
 
 exports.updateUserRole = async (req, res) => {
+  let connection;
   try {
     const { role } = req.body;
-    const targetUserId = req.params.id;
+    const targetUserId = positiveInt(req.params.id, { field: 'User ID' });
 
     // Check if requester is admin
     const [admins] = await db.query('SELECT role FROM users WHERE id = ?', [req.userId]);
@@ -325,11 +344,30 @@ exports.updateUserRole = async (req, res) => {
       return res.status(400).json({ message: 'Invalid role' });
     }
 
-    await db.query('UPDATE users SET role = ? WHERE id = ?', [role, targetUserId]);
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+    const [targets] = await connection.query('SELECT id, role FROM users WHERE id = ? FOR UPDATE', [targetUserId]);
+    if (!targets.length) {
+      await connection.rollback();
+      return res.status(404).json({ message: 'User not found' });
+    }
+    if (targets[0].role === 'admin' && role !== 'admin') {
+      const [adminRows] = await connection.query(`SELECT id FROM users WHERE role = 'admin' FOR UPDATE`);
+      if (adminRows.length <= 1) {
+        await connection.rollback();
+        return res.status(409).json({ message: 'Cannot demote the last administrator' });
+      }
+    }
+
+    await connection.query('UPDATE users SET role = ? WHERE id = ?', [role, targetUserId]);
+    await connection.commit();
 
     res.json({ message: 'User role updated successfully', role });
   } catch (error) {
+    if (connection) await connection.rollback().catch(() => {});
     console.error('Update role error:', error);
     res.status(500).json({ message: 'Server error' });
+  } finally {
+    connection?.release();
   }
 };

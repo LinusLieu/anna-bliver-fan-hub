@@ -1,14 +1,6 @@
 const pointsService = require('../services/pointsService');
 const POINT_FILTER = { currency_type: 'points' };
 
-function requireAdmin(req, res) {
-  if (req.userRole !== 'admin') {
-    res.status(403).json({ message: 'Admin access required' });
-    return false;
-  }
-  return true;
-}
-
 exports.getSummary = async (req, res) => {
   try {
     const summary = await pointsService.getPointSummary(req.userId);
@@ -38,8 +30,6 @@ exports.getTransactions = async (req, res) => {
 };
 
 exports.getAdminAccounts = async (req, res) => {
-  if (!requireAdmin(req, res)) return;
-
   try {
     const result = await pointsService.listAdminAccounts({
       page: req.query.page,
@@ -54,8 +44,6 @@ exports.getAdminAccounts = async (req, res) => {
 };
 
 exports.refreshAdminAccountProfiles = async (req, res) => {
-  if (!requireAdmin(req, res)) return;
-
   try {
     const result = await pointsService.refreshAccountProfiles(req.body.bilibili_uids || [], {
       refreshAll: req.body.refresh_all !== false
@@ -68,8 +56,6 @@ exports.refreshAdminAccountProfiles = async (req, res) => {
 };
 
 exports.createAdminAccount = async (req, res) => {
-  if (!requireAdmin(req, res)) return;
-
   try {
     const account = await pointsService.createPointAccount({
       bilibiliUid: req.body.bilibili_uid,
@@ -84,8 +70,6 @@ exports.createAdminAccount = async (req, res) => {
 };
 
 exports.getAdminAccountTransactions = async (req, res) => {
-  if (!requireAdmin(req, res)) return;
-
   try {
     const result = await pointsService.getTransactionsByUid(
       req.params.bilibiliUid,
@@ -101,8 +85,6 @@ exports.getAdminAccountTransactions = async (req, res) => {
 };
 
 exports.getAdminWalletTransactions = async (req, res) => {
-  if (!requireAdmin(req, res)) return;
-
   try {
     const result = await pointsService.getTransactionsByWalletId(
       req.params.walletId,
@@ -118,8 +100,6 @@ exports.getAdminWalletTransactions = async (req, res) => {
 };
 
 exports.adjustAccountPoints = async (req, res) => {
-  if (!requireAdmin(req, res)) return;
-
   try {
     const { points_delta, reason } = req.body;
     const result = await pointsService.adjustAccountPoints(
@@ -142,8 +122,6 @@ exports.adjustAccountPoints = async (req, res) => {
 };
 
 exports.previewImport = async (req, res) => {
-  if (!requireAdmin(req, res)) return;
-
   try {
     const result = await pointsService.previewImport(req.body.csv || '');
     res.json(result);
@@ -154,8 +132,6 @@ exports.previewImport = async (req, res) => {
 };
 
 exports.commitImport = async (req, res) => {
-  if (!requireAdmin(req, res)) return;
-
   try {
     const result = await pointsService.commitImport(
       req.body.csv || '',
@@ -173,8 +149,6 @@ exports.commitImport = async (req, res) => {
 };
 
 exports.exportPoints = async (req, res) => {
-  if (!requireAdmin(req, res)) return;
-
   try {
     const type = req.query.type === 'transactions' ? 'transactions' : 'accounts';
     const csv = type === 'transactions'
@@ -192,8 +166,6 @@ exports.exportPoints = async (req, res) => {
 };
 
 exports.settle = async (req, res) => {
-  if (!requireAdmin(req, res)) return;
-
   try {
     const result = await pointsService.settleBilibiliPoints({ operatedBy: req.userId });
     res.json({ success: true, result });
@@ -204,8 +176,6 @@ exports.settle = async (req, res) => {
 };
 
 exports.mergeAllFrozen = async (req, res) => {
-  if (!requireAdmin(req, res)) return;
-
   try {
     const result = await pointsService.mergeAllFrozenPoints(req.userId);
     res.json({ success: true, result });

@@ -36,16 +36,6 @@ logs/
 coverage/
 .nyc_output/
 
-# Deployment files
-DEPLOY_UBUNTU_22.md
-deploy.sh
-APPLICATION_FLOW.md
-IMPLEMENTATION_SUMMARY.md
-FUTURE_IMPROVEMENTS.md
-IMPLEMENTATION_SUMMARY.md
-PROJECT_OVERVIEW.md
-QUICKSTART.md
-
 .claude/
 .agents/
 .playwright-cli/

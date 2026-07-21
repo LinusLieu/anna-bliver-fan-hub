@@ -5,10 +5,14 @@ import BackButton from '../components/BackButton';
 import { useFeedback } from '../components/FeedbackProvider';
 import { useSiteSettings } from '../context/SiteSettingsContext';
 
+const requestErrorMessage = (fallback, error) => {
+  const detail = error?.response?.data?.message;
+  return detail ? `${fallback}：${detail}` : fallback;
+};
+
 function Playlists() {
   const { confirm, toast } = useFeedback();
   const { siteSettings } = useSiteSettings();
-  const [playlists, setPlaylists] = useState([]);
   const [allSongs, setAllSongs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -29,7 +33,6 @@ function Playlists() {
   const [allTags, setAllTags] = useState([]);
 
   const currentUser = useMemo(() => authService.getCurrentUser(), []);
-  const isAdmin = currentUser?.role === 'admin';
   const [canEdit, setCanEdit] = useState(false);
 // Get all unique tags from songs
   const availableTags = useMemo(() => ['All', ...new Set(allSongs.flatMap(song =>
@@ -118,44 +121,21 @@ function Playlists() {
     }
   }, []);
 
-  const loadPlaylists = useCallback(async () => {
+  const loadSongs = useCallback(async () => {
     try {
-      const playlistsData = await playlistService.getAllPlaylists();
-      setPlaylists(playlistsData);
-
-      // 为每个播放列表获取详情（包含歌曲）
-      const allPlaylistsWithSongs = await Promise.all(
-        playlistsData.map(playlist => playlistService.getPlaylistById(playlist.id))
-      );
-
-      // 收集所有播放列表中的所有歌曲
-      const songs = [];
-      let globalIndex = 0;
-      allPlaylistsWithSongs.forEach((playlist) => {
-        if (playlist.songs && playlist.songs.length > 0) {
-          playlist.songs.forEach((song) => {
-            songs.push({
-              ...song,
-              playlistTitle: playlist.title,
-              globalIndex: globalIndex
-            });
-            globalIndex++;
-          });
-        }
-      });
-
+      const songs = await playlistService.getAllSongs();
       songs.sort((a, b) => (a.title || '').localeCompare(b.title || '', 'zh-CN'));
-
       setAllSongs(songs);
+      setError('');
     } catch (err) {
-      setError('Failed to load playlists');
+      setError('加载歌曲列表失败');
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadPlaylists();
+    loadSongs();
     loadTags();
     // Check edit permissions
     if (currentUser) {
@@ -163,13 +143,12 @@ function Playlists() {
         setCanEdit(true);
       } else {
         permissionService.getMyPermissions().then(perms => {
-          const hasEditPerm = perms.permissions?.includes('playlist.edit.single') ||
-                              perms.permissions?.includes('playlist.edit.batch');
+          const hasEditPerm = perms.permissions?.includes(permissionService.PERMISSIONS.PLAYLIST_MANAGE);
           setCanEdit(hasEditPerm);
         }).catch(() => setCanEdit(false));
       }
     }
-  }, [currentUser, loadPlaylists, loadTags]);
+  }, [currentUser, loadSongs, loadTags]);
 
   if (loading) {
     return <div className="loading">正在加载歌单...</div>;
@@ -205,10 +184,12 @@ function Playlists() {
     try {
       await playlistService.updateSong(editingSong.id, updatedData);
       setEditingSong(null);
-      loadPlaylists(); // Reload to see changes
+      await loadSongs();
+      toast('歌曲更新成功', { type: 'success' });
     } catch (err) {
       console.error('Failed to update song', err);
-      toast('更新歌曲失败', { type: 'error' });
+      toast(requestErrorMessage('更新歌曲失败', err), { type: 'error' });
+      throw err;
     }
   };
 
@@ -225,58 +206,36 @@ function Playlists() {
     try {
       await playlistService.deleteSong(songId);
       setEditingSong(null);
-      loadPlaylists(); // Reload to see changes
+      await loadSongs();
     } catch (err) {
       console.error('Failed to delete song', err);
-      toast('删除歌曲失败', { type: 'error' });
+      toast(requestErrorMessage('删除歌曲失败', err), { type: 'error' });
     }
   };
 
   const handleAddSong = async (newSongData) => {
     try {
-      // Default to first playlist if available, or handle playlist selection logic
-      const defaultPlaylistId = playlists.length > 0 ? playlists[0].id : null;
-
-      if (!defaultPlaylistId) {
-        toast('没有可添加歌曲的歌单', { type: 'warning' });
-        return;
-      }
-
-      await playlistService.addSong(defaultPlaylistId, newSongData);
-
-      // If there are tags, we need to update them separately because addSong might not handle tags directly
-      // depending on backend implementation. For now assuming addSong returns the new song ID
-      // But based on current backend, addSong doesn't take tags.
-      // So we might need to call updateSong immediately after adding to set tags,
-      // OR update backend addSong to handle tags.
-      // Let's check backend addSong implementation... it doesn't handle tags.
-      // So we will just add the song first.
-
+      await playlistService.addSong(newSongData);
       setIsAddingSong(false);
-      loadPlaylists();
-      loadTags();
+      await Promise.all([loadSongs(), loadTags()]);
+      toast('歌曲添加成功', { type: 'success' });
     } catch (err) {
       console.error('Failed to add song', err);
-      toast('添加歌曲失败', { type: 'error' });
+      toast(requestErrorMessage('添加歌曲失败', err), { type: 'error' });
+      throw err;
     }
   };
 
   const handleBatchAddSongs = async (songs) => {
     try {
-      const defaultPlaylistId = playlists.length > 0 ? playlists[0].id : null;
-      if (!defaultPlaylistId) {
-        toast('没有可添加歌曲的歌单', { type: 'warning' });
-        return;
-      }
-
-      const result = await playlistService.batchAddSongs(defaultPlaylistId, songs);
+      const result = await playlistService.batchAddSongs(songs);
       toast(`成功添加 ${result.count} 首歌曲`, { type: 'success' });
       setIsBatchAdding(false);
-      loadPlaylists();
-      loadTags();
+      await Promise.all([loadSongs(), loadTags()]);
     } catch (err) {
       console.error('Failed to batch add songs', err);
-      toast('批量添加歌曲失败', { type: 'error' });
+      toast(requestErrorMessage('批量添加歌曲失败', err), { type: 'error' });
+      throw err;
     }
   };
 
@@ -284,7 +243,7 @@ function Playlists() {
     try {
       await playlistService.updateTag(tagId, tagData);
       loadTags();
-      loadPlaylists(); // Reload playlists to update tags on songs
+      loadSongs();
     } catch (err) {
       console.error('Failed to update tag', err);
       toast('更新标签失败', { type: 'error' });
@@ -303,7 +262,7 @@ function Playlists() {
     try {
       await playlistService.deleteTag(tagId);
       loadTags();
-      loadPlaylists(); // Reload playlists to update tags on songs
+      loadSongs();
     } catch (err) {
       console.error('Failed to delete tag', err);
       toast('删除标签失败', { type: 'error' });
@@ -337,24 +296,20 @@ function Playlists() {
                 >
                   + 添加歌曲
                 </button>
-                {isAdmin && (
-                  <>
-                    <button
-                      className="btn btn-secondary"
-                      style={{ borderRadius: '20px', padding: '8px 16px', fontSize: '0.9rem' }}
-                      onClick={() => setIsBatchAdding(true)}
-                    >
-                      + 批量添加
-                    </button>
-                    <button
-                      className="btn btn-secondary"
-                      style={{ borderRadius: '20px', padding: '8px 16px', fontSize: '0.9rem' }}
-                      onClick={() => setIsManagingTags(true)}
-                    >
-                      # 管理标签
-                    </button>
-                  </>
-                )}
+                <button
+                  className="btn btn-secondary"
+                  style={{ borderRadius: '20px', padding: '8px 16px', fontSize: '0.9rem' }}
+                  onClick={() => setIsBatchAdding(true)}
+                >
+                  + 批量添加
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  style={{ borderRadius: '20px', padding: '8px 16px', fontSize: '0.9rem' }}
+                  onClick={() => setIsManagingTags(true)}
+                >
+                  # 管理标签
+                </button>
               </>
             )}
             <button
@@ -472,7 +427,7 @@ function Playlists() {
           <div className="songs-grid">
             {filteredSongs.slice(0, visibleCount).map((song, index) => (
               <div
-                key={`${song.playlistTitle}-${song.id}`}
+                key={song.id}
                 className="song-bubble"
                 onClick={() => handleCopyToClipboard(song.title)}
                 style={{ cursor: 'pointer' }}
@@ -701,6 +656,8 @@ function TagManagerModal({ tags, onUpdate, onDelete, onCancel }) {
 
 function EditSongModal({ song, allTags, onSave, onDelete, onCancel, title }) {
   const { toast } = useFeedback();
+  const submittingRef = useRef(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     title: song.title,
     artist: song.artist,
@@ -713,9 +670,19 @@ function EditSongModal({ song, allTags, onSave, onDelete, onCancel, title }) {
   const [newTagData, setNewTagData] = useState({ name: '', color: '#6c5ce7' });
   const [localTags, setLocalTags] = useState(allTags);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onSave(formData);
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    setIsSubmitting(true);
+    try {
+      await onSave(formData);
+    } catch (error) {
+      // The parent keeps the modal open and shows the request error.
+    } finally {
+      submittingRef.current = false;
+      setIsSubmitting(false);
+    }
   };
 
   const toggleTag = (tag) => {
@@ -856,8 +823,10 @@ function EditSongModal({ song, allTags, onSave, onDelete, onCancel, title }) {
                 删除
               </button>
             )}
-            <button type="button" onClick={onCancel} className="btn btn-secondary">取消</button>
-            <button type="submit" className="btn btn-primary">保存</button>
+            <button type="button" onClick={onCancel} className="btn btn-secondary" disabled={isSubmitting}>取消</button>
+            <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+              {isSubmitting ? '保存中…' : '保存'}
+            </button>
           </div>
         </form>
       </div>
@@ -867,8 +836,10 @@ function EditSongModal({ song, allTags, onSave, onDelete, onCancel, title }) {
 
 function BatchAddSongsModal({ allTags, onSave, onCancel }) {
   const { toast } = useFeedback();
+  const submittingRef = useRef(false);
   const [rows, setRows] = useState([{ title: '', artist: '', note: '', tags: [] }]);
-  const [, setIsUploading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTagRow, setActiveTagRow] = useState(null);
   const [newTagInput, setNewTagInput] = useState('');
 
@@ -963,15 +934,24 @@ function BatchAddSongsModal({ allTags, onSave, onCancel }) {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submittingRef.current) return;
     const validRows = rows.filter(r => r.title.trim() && r.artist.trim());
     if (validRows.length === 0) {
       toast('请至少添加一首有效歌曲', { type: 'warning' });
       return;
     }
-    // tags are already arrays of strings
-    onSave(validRows);
+    submittingRef.current = true;
+    setIsSubmitting(true);
+    try {
+      await onSave(validRows);
+    } catch (error) {
+      // The parent keeps the modal open and shows the request error.
+    } finally {
+      submittingRef.current = false;
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -987,6 +967,7 @@ function BatchAddSongsModal({ allTags, onSave, onCancel }) {
                 type="file"
                 accept=".xlsx, .xls"
                 onChange={handleFileUpload}
+                disabled={isUploading || isSubmitting}
                 style={{ display: 'none' }}
               />
             </label>
@@ -1092,8 +1073,10 @@ function BatchAddSongsModal({ allTags, onSave, onCancel }) {
           </button>
 
           <div className="modal-actions">
-            <button type="button" onClick={onCancel} className="btn btn-secondary">取消</button>
-            <button type="submit" className="btn btn-primary">保存全部</button>
+            <button type="button" onClick={onCancel} className="btn btn-secondary" disabled={isSubmitting}>取消</button>
+            <button type="submit" className="btn btn-primary" disabled={isSubmitting || isUploading}>
+              {isSubmitting ? '保存中…' : '保存全部'}
+            </button>
           </div>
         </form>
 

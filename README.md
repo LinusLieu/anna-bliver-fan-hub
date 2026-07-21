@@ -1,135 +1,235 @@
+<p align="center">
+  <img src="frontend/public/annapiggy-logo.png" alt="小猪anna的秘密基地" width="320" />
+</p>
+
 # Anna BLive Fan Hub
 
-`anna-bliver-fan-hub` 是一个面向 B站直播社区的全栈展示项目。公开版保留歌单、棉花糖、积分账本和完整的积分商城，站点资料与主题均可由管理员配置。
+`anna-bliver-fan-hub` 是一个面向 B站直播社区的开源全栈站点。它从原 `anna_site` 的公开业务中整理而来，保留网页歌单、匿名棉花糖、B站账号绑定、积分账本、积分商城和可配置主题，同时将 Bot、验证码与邮件都设计为可选集成。
+
+项目采用 React 18、Express、MySQL 8 和 JWT。公开版只处理积分币种，不包含盲盒、电影票、OBS、激活码、QQ/AI 配置或私有 Bot 管理页面。
 
 ![桌面端首页](docs/screenshots/home-desktop.png)
 
 <details>
-<summary>移动端首页</summary>
+<summary>查看移动端首页</summary>
 
 ![移动端首页](docs/screenshots/home-mobile.png)
 
 </details>
 
-## 核心功能
+## 功能
 
-- 可搜索、带标签的网页歌单与批量导入管理
-- 匿名棉花糖投递、用户认领、回复和已读管理
-- 最多五个 B站 UID 绑定到同一积分钱包
-- 礼物与 SC 事件幂等入库、按房间和起算时间折算积分
-- 商品选项、购物车、收货地址、积分结账、个人订单
-- 后台商品管理、订单处理、拒绝或取消时幂等退款与回库存
-- 数据库配置优先的站点标题、文案、UID、Logo、备案和主题色
-- 全站固定作者署名与“小猪anna的秘密基地”品牌 Footer
+- 单站歌曲列表：搜索、标签、冠名、单条维护和批量导入。
+- 棉花糖：匿名投递、登录后认领、管理回复和已读状态。
+- B站绑定：扫码绑定最多五个 UID，共享同一积分钱包。
+- 积分账本：手工调整、CSV 导入、事件幂等、余量电池和完整流水。
+- 积分商城：商品选项、图片、购物车、地址、事务结账、订单和幂等退款。
+- 权限管理：歌曲、棉花糖、积分、商城和站点配置可分别授权。
+- 站点配置：标题、文案、Logo、favicon、首页 UID、备案和多套主题色卡。
+- 可选集成：阿里云 Captcha、腾讯云 SES 和 bili-bot WebSocket。
 
-公开版不包含 Bot 管理、QQ/AI 配置、盲盒统计、礼物展示或截图、OBS、激活码、主播房间管理和电影票币种。
-
-## 技术架构
+## 项目结构
 
 ```text
-React 18 SPA
-  | REST + JWT
-Express API
-  |-- MySQL 8: users, content, points ledger, shop orders
-  |-- Bilibili QR API: server-only transient login session
-  |-- Optional Bot WebSocket client: gift / super_chat events
-  `-- Optional Aliyun Captcha and Tencent SES
+anna-bliver-fan-hub/
+├─ .github/workflows/ci.yml       # GitHub Actions 测试、构建与依赖审计
+├─ backend/
+│  ├─ scripts/seed_demo.js        # 可选演示数据
+│  ├─ src/config/                 # 数据库、基线 SQL、运行配置校验
+│  ├─ src/controllers/            # REST 控制器
+│  ├─ src/middleware/             # JWT、可选认证、细粒度权限
+│  ├─ src/routes/                 # API 路由
+│  ├─ src/services/               # 积分、内部歌单、bili-bot 事件桥
+│  ├─ src/utils/                  # Captcha、邮件、B站 API、输入校验
+│  └─ test/                       # Node.js 回归与单元测试
+├─ frontend/
+│  ├─ public/                     # favicon、默认 Logo 和 PWA 元数据
+│  └─ src/
+│     ├─ components/              # 导航、Footer、反馈、绑定等通用组件
+│     ├─ context/                 # 站点配置与主题上下文
+│     ├─ pages/                   # 用户页面与管理页面
+│     ├─ services/                # REST 客户端
+│     └─ styles/                  # 全站和管理主题
+├─ docs/                          # 架构、API、配置与部署文档
+├─ CONTRIBUTING.md
+├─ SECURITY.md
+└─ package.json                   # 根目录聚合命令
 ```
 
-前后端分为 `frontend/` 与 `backend/`。`backend/src/config/schema.sql` 是全新部署基线，不承担旧生产数据库迁移。
+更详细的模块与数据流见 [架构说明](docs/ARCHITECTURE.md)，REST、权限和 bili-bot 协议见 [API 文档](docs/API.md)。
 
 ## 本地运行
 
-要求 Node.js 20+、npm 和 MySQL 8。
+### 要求
+
+- Node.js 20 LTS 或更新版本
+- npm 10 或更新版本
+- MySQL 8
+
+根目录没有 `npm start`，因为前后端需要两个常驻进程。根目录只提供安装、测试、构建和演示数据聚合命令。
+
+### 1. 安装依赖
+
+```bash
+npm run install:all
+```
+
+### 2. 初始化数据库
+
+Windows PowerShell 或 CMD：
+
+```powershell
+cmd /c "mysql -u root -p < backend\src\config\schema.sql"
+```
+
+Linux、macOS、Git Bash：
 
 ```bash
 mysql -u root -p < backend/src/config/schema.sql
-
-cd backend
-cp .env.example .env
-npm install
-npm start
-
-cd ../frontend
-cp .env.example .env
-npm install
-npm start
 ```
 
-管理员账号不带默认密码。需要虚构演示数据时，显式提供至少 12 位密码：
+SQL 会创建 `anna_bliver_fan_hub` 数据库和 22 张基线表，但不会替你创建 MySQL 登录用户。最简单的本地方式是将后端 `.env` 的 `DB_USER` 改为已有的 MySQL 用户；独立数据库用户及授权命令见 [部署文档](docs/DEPLOYMENT.md#数据库账号)。
+
+### 3. 创建本地配置
+
+PowerShell：
+
+```powershell
+Copy-Item backend/.env.example backend/.env
+Copy-Item frontend/.env.example frontend/.env
+```
+
+Bash：
+
+```bash
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
+```
+
+至少修改后端的数据库账号和 `JWT_SECRET`。生产环境会拒绝占位 JWT、缺失的 `CORS_ORIGIN` 或无效的 `TRUST_PROXY`。完整变量说明见 [配置参考](docs/CONFIGURATION.md)。
+
+### 4. 分别启动
+
+终端一：
 
 ```bash
 cd backend
+npm start
+```
+
+终端二：
+
+```bash
+cd frontend
+npm start
+```
+
+默认地址：前端 `http://localhost:3000`，后端健康检查 `http://localhost:5000/api/health`。
+
+### 5. 可选演示管理员
+
+演示账号不会使用默认密码，密码至少 12 位。
+
+PowerShell：
+
+```powershell
+$env:DEMO_ADMIN_PASSWORD='replace-with-a-local-password'
+npm run seed:demo
+Remove-Item Env:DEMO_ADMIN_PASSWORD
+```
+
+Bash：
+
+```bash
 DEMO_ADMIN_PASSWORD='replace-with-a-local-password' npm run seed:demo
 ```
 
-演示账号邮箱为保留域名 `demo-admin@example.invalid`，演示数据不对应真实用户、UID 或订单。
+演示邮箱为保留域名 `demo-admin@example.invalid`，演示数据不对应真实用户、UID 或订单。
 
-## 网站配置
+## 可选验证与邮件
 
-管理员页面：`/admin/site-config`。
+- 四项 `ALIYUN_*` 全部存在时启用 Captcha；任一缺失即关闭。
+- `TENCENT_SECRET_ID`、`TENCENT_SECRET_KEY`、`SES_FROM_EMAIL`、`SES_TEMPLATE_ID` 全部存在时启用注册邮箱验证。
+- 商城和棉花糖通知还需要各自的模板 ID 与收件地址；不完整时只跳过通知，不回滚业务。
+- 未配置 `BOT_WS_URL` 时 bili-bot 桥完全关闭，网站、手工积分、CSV 与商城独立运行。
 
-配置优先级固定为：
+## 角色与权限
 
-```text
-settings 表 > 环境变量 > 通用默认值
-```
+管理员始终拥有所有权限，并可给普通用户或高级用户分配：
 
-可配置网站标题、创作者称呼、Logo、favicon、首页 B站 UID、欢迎语、三张功能卡、歌单和棉花糖文案、备案信息及主题色。Footer 的 `© 2026 Linus_Lieu` 与作者链接是代码级固定署名，不允许后台覆盖。
+| 权限 | 能力 |
+| --- | --- |
+| `playlist.manage` | 歌曲、标签、冠名和批量导入 |
+| `marshmallow.manage` | 查看、回复、标记与删除棉花糖 |
+| `points.manage` | 积分账号、流水、导入、调整和结算 |
+| `prize.manage` | 商品、图片、库存、订单和退款 |
+| `site_config.manage` | 站点资料、主题、Logo 与注册开关 |
 
-## 积分与商城事务
+权限管理本身只允许管理员进入，并禁止降级最后一个管理员。
 
-`bilibili_point_events.source_event_id` 唯一。礼物与 SC 先持久化，再由结算器按 `POINTS_ROOM_ID`、`POINTS_START_AT` 和 `POINTS_COIN_PER_POINT` 过滤与折算。`settled_at` 使迟到、乱序和启动补偿事件可重复扫描而不重复加分。
+## bili-bot 预留接口
 
-购物车操作不预扣积分。结账在同一 MySQL 事务内锁定钱包、商品和选项库存，然后扣积分、减库存、创建订单与兑换明细，最后清空已结算购物车。任一步失败都会回滚。订单拒绝或取消使用唯一退款流水，并以 `refunded_at` 防止重复退分和重复回库存。
+网站可作为 WebSocket 客户端连接公开或自建的 bili-bot 事件服务。当前支持 `gift` 与 `super_chat`，以稳定的 `event_id` 幂等入库并回复 `event_ack`；连接成功后会发送 `resume` 请求，断线采用指数退避重连。
 
-## 可选 Bot WebSocket
+该接口只负责“事件进入积分账本”，不要求 Bot 与网站部署在同一台机器，也不会在网站仓库保存 Bot 登录凭证。完整消息、ACK、鉴权、重试约定及未来弹幕/舰长/任务事件扩展见 [API 与 bili-bot 扩展文档](docs/API.md#bili-bot-websocket-接口)。
 
-未设置 `BOT_WS_URL` 时连接器完全关闭，网站、手工积分、CSV 导入和商城仍可独立运行。配置后，网站作为客户端接收：
-
-```json
-{
-  "type": "gift",
-  "event_id": "stable-source-id",
-  "room_id": "<configured-room-id>",
-  "uid": "<bilibili-uid>",
-  "username": "Demo User",
-  "total_coin": 1000,
-  "timestamp": "2026-01-01T00:00:00+08:00"
-}
-```
-
-`type` 也可为 `super_chat`。网站返回：
-
-```json
-{ "type": "event_ack", "event_id": "stable-source-id", "status": "accepted" }
-```
-
-`status` 为 `accepted`、`duplicate` 或 `rejected`。可通过 `BOT_WS_TOKEN` 使用 Bearer Token；连接器带指数退避和启动补偿请求。未来公开 Bot 时，只需稳定生成 `event_id` 并实现 ACK 重发队列。
-
-## 扫码绑定安全
-
-- `POST /api/bilibili-binding/qr` 创建绑定到当前网站用户的短时会话。
-- `GET /api/bilibili-binding/qr/:key` 只能由会话创建者轮询。
-- B站 Cookie 和 refresh token 只存在于单次后端调用内，不返回前端、不入库、不写日志。
-- 同一 UID 不可绑定不同用户；每位用户最多五个 UID；主 UID 可切换。
-- 绑定时匿名 UID 钱包在事务内合并到用户钱包，并保留完整流水。
-
-## 测试
+## 测试与构建
 
 ```bash
-cd backend && npm test
-cd frontend && npm run build
+npm test
+npm run build
 ```
 
-测试覆盖配置优先级、Footer 安全链接、扫码会话隔离、事件幂等和过滤、购物车不预扣、结账原子顺序、退款幂等、演示密码门槛及移除模块扫描。仓库截图由 Playwright 在 1440×900 和 390×844 视口生成。
+前端单元测试：
 
-## 安全与公开边界
+```bash
+npm run test:frontend
+```
 
-- `.env.example` 仅含占位符，`.env`、数据库、上传文件和构建产物均被忽略。
-- 邮件发件地址、站点域名和通知目标全部来自环境变量。
-- 本仓库是无旧 Git 历史的公开展示版，不包含生产迁移或备份。
-- 发布前建议再次运行密钥和个人信息扫描，并轮换任何曾经进入其他仓库历史的凭证。
+依赖审计：
+
+```bash
+npm audit --prefix backend
+npm audit --prefix frontend
+```
+
+GitHub Actions 会在 push 和 pull request 时执行后端测试、前端测试、生产构建和生产依赖高危漏洞审计。浏览器与真实 MySQL 流程仍应在发布前按 [部署验收清单](docs/DEPLOYMENT.md#发布验收) 手工验证。
+
+## 文档
+
+- [架构与数据流](docs/ARCHITECTURE.md)
+- [配置与环境变量](docs/CONFIGURATION.md)
+- [REST API、权限与 bili-bot WebSocket](docs/API.md)
+- [部署与发布验收](docs/DEPLOYMENT.md)
+- [安全策略](SECURITY.md)
+- [贡献指南](CONTRIBUTING.md)
+
+## 作者
+
+<table>
+  <tr>
+    <td><img src="https://github.com/LinusLieu.png?size=96" width="72" alt="Linus_Lieu" /></td>
+    <td>
+      <strong>Linus_Lieu</strong><br />
+      项目开发与维护<br />
+      <a href="https://github.com/LinusLieu">GitHub 主页</a>
+    </td>
+  </tr>
+</table>
+
+## 友情链接
+
+<table>
+  <tr>
+    <td rowspan="2"><img src="frontend/public/annapiggy-logo.png" width="180" alt="小猪anna的秘密基地" /></td>
+    <td><a href="https://annapiggy.live"><strong>小猪anna的秘密基地</strong></a></td>
+    <td>原站与项目视觉、公开业务的来源。</td>
+  </tr>
+  <tr>
+    <td><a href="https://space.bilibili.com/501066866"><strong>小猪anna的 B站个人空间</strong></a></td>
+    <td>UID：501066866</td>
+  </tr>
+</table>
 
 ## License
 

@@ -24,6 +24,7 @@ import AdminPrizes from './pages/AdminPrizes';
 import AdminPrizeOrders from './pages/AdminPrizeOrders';
 import SiteConfig from './pages/SiteConfig/SiteConfig';
 import './styles/App.css';
+import './styles/AdminTheme.css';
 
 const AuthVerifier = () => {
   const location = useLocation();
@@ -54,6 +55,10 @@ const AdminRoute = ({ children }) => (
   <ProtectedRoute adminOnly={true}>{children}</ProtectedRoute>
 );
 
+const PermissionRoute = ({ permission, children }) => (
+  <ProtectedRoute requiredPermissions={[permission]}>{children}</ProtectedRoute>
+);
+
 function App() {
   return (
     <SiteSettingsProvider>
@@ -76,12 +81,12 @@ function App() {
                 <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                 <Route path="/admin/marshmallows" element={<ProtectedRoute requiredPermissions={['marshmallow.manage']}><MarshmallowAdmin /></ProtectedRoute>} />
                 <Route path="/admin/permissions" element={<AdminRoute><PermissionManagement /></AdminRoute>} />
-                <Route path="/admin/points" element={<AdminRoute><AdminPoints /></AdminRoute>} />
-                <Route path="/admin/prizes" element={<AdminRoute><AdminPrizes /></AdminRoute>} />
-                <Route path="/admin/prizes/new" element={<AdminRoute><AdminPrizes /></AdminRoute>} />
-                <Route path="/admin/prizes/:prizeId/edit" element={<AdminRoute><AdminPrizes /></AdminRoute>} />
-                <Route path="/admin/prize-orders" element={<AdminRoute><AdminPrizeOrders /></AdminRoute>} />
-                <Route path="/admin/site-config" element={<AdminRoute><SiteConfig /></AdminRoute>} />
+                <Route path="/admin/points" element={<PermissionRoute permission="points.manage"><AdminPoints /></PermissionRoute>} />
+                <Route path="/admin/prizes" element={<PermissionRoute permission="prize.manage"><AdminPrizes /></PermissionRoute>} />
+                <Route path="/admin/prizes/new" element={<PermissionRoute permission="prize.manage"><AdminPrizes /></PermissionRoute>} />
+                <Route path="/admin/prizes/:prizeId/edit" element={<PermissionRoute permission="prize.manage"><AdminPrizes /></PermissionRoute>} />
+                <Route path="/admin/prize-orders" element={<PermissionRoute permission="prize.manage"><AdminPrizeOrders /></PermissionRoute>} />
+                <Route path="/admin/site-config" element={<PermissionRoute permission="site_config.manage"><SiteConfig /></PermissionRoute>} />
               </Routes>
             </main>
             <Footer />

@@ -470,6 +470,18 @@
   margin-bottom: 1rem;
 }
 
+.role-section,
+.permissions-section {
+  margin-bottom: 1.5rem;
+}
+
+.role-section h3,
+.permissions-section h3 {
+  color: #9b59b6;
+  margin-bottom: 1rem;
+  font-size: 1.1rem;
+}
+
 .permissions-grid, .rooms-grid {
   display: flex;
   flex-direction: column;

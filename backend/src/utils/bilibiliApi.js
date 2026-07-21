@@ -1,4 +1,5 @@
 const axios = require('axios');
+const crypto = require('node:crypto');
 
 // 缓存主播信息，减少API请求
 const anchorInfoCache = new Map();
@@ -9,7 +10,7 @@ let generatedBuvid3 = null;
 
 function generateBuvid3() {
   const chars = '0123456789ABCDEF';
-  const randomChars = (length) => Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  const randomChars = (length) => [...crypto.randomBytes(length)].map((byte) => chars[byte & 0x0f]).join('');
   const suffix = `${Date.now() % 100000}`.padStart(5, '0') + 'infoc';
   return `${randomChars(8)}-${randomChars(4)}-${randomChars(4)}-${randomChars(4)}-${randomChars(12)}${suffix}`;
 }

@@ -1,0 +1,549 @@
+/*
+ * Shared color layer for the public administration pages.
+ *
+ * The page styles keep their original layouts, while this file owns the
+ * palette. It is intentionally imported after the page styles so a theme
+ * change is reflected consistently without duplicating every preset color in
+ * each administration screen.
+ */
+
+:is(
+  .admin-prizes,
+  .admin-points,
+  .admin-prize-orders,
+  .permission-management,
+  .marshmallow-admin-page
+) {
+  color: var(--text-dark);
+}
+
+:is(
+  .admin-prizes,
+  .admin-points,
+  .admin-prize-orders,
+  .permission-management,
+  .marshmallow-admin-page
+) :is(input:not([type="checkbox"]):not([type="radio"]), textarea, select) {
+  background: var(--theme-input-surface);
+  border-color: var(--theme-border-soft);
+  color: var(--text-dark);
+}
+
+:is(
+  .admin-prizes,
+  .admin-points,
+  .admin-prize-orders,
+  .permission-management,
+  .marshmallow-admin-page
+) :is(input:not([type="checkbox"]):not([type="radio"]), textarea, select):focus {
+  border-color: var(--primary-purple);
+  box-shadow: 0 0 0 3px var(--theme-focus-ring);
+  outline: none;
+}
+
+:is(
+  .admin-prizes,
+  .admin-points,
+  .admin-prize-orders,
+  .permission-management,
+  .marshmallow-admin-page
+) :is(input[type="checkbox"], input[type="radio"]) {
+  accent-color: var(--primary-purple);
+}
+
+:is(.admin-prizes, .admin-points, .admin-prize-orders, .permission-management)
+  :is(h1, h2, h3) {
+  color: var(--dark-purple);
+}
+
+:is(.admin-prizes, .admin-points, .admin-prize-orders, .permission-management)
+  :is(p, small, time, .hint, .empty-inline, .points-empty) {
+  color: var(--text-light);
+}
+
+/* Shared action and feedback colors */
+:is(.admin-prizes, .admin-points) .primary-action,
+.admin-points .points-search button,
+.admin-points .points-pagination button,
+.admin-points .transaction-modal-footer button,
+.permission-management :is(.search-bar button, .edit-btn, .save-btn, .pagination button) {
+  background: var(--primary-purple);
+  color: var(--white);
+}
+
+:is(.admin-prizes, .admin-points) :is(.secondary-action, .file-button),
+.admin-points .preview-pagination button,
+.permission-management .cancel-btn,
+.admin-prize-orders .admin-order-item-actions button {
+  background: var(--theme-primary-soft);
+  color: var(--dark-purple);
+}
+
+:is(.admin-prizes, .admin-points) :is(.primary-action, .secondary-action, .file-button):hover:not(:disabled),
+.permission-management :is(.search-bar button, .edit-btn, .save-btn):hover:not(:disabled) {
+  box-shadow: var(--shadow-hover);
+}
+
+:is(.admin-prizes, .admin-points, .permission-management) button:disabled {
+  opacity: 0.5;
+}
+
+:is(.admin-prizes, .admin-points) .primary-action:disabled,
+.admin-points :is(.points-pagination button, .transaction-modal-footer button):disabled,
+.permission-management :is(.save-btn, .pagination button):disabled {
+  background: var(--primary-purple);
+  color: var(--white);
+}
+
+.admin-prizes .danger-action {
+  background: var(--theme-danger-surface);
+  color: var(--danger-color);
+}
+
+:is(.admin-prizes .prizes-success, .admin-points .points-success, .permission-management .success-message) {
+  background: var(--theme-success-surface);
+  color: var(--success-color);
+}
+
+:is(.admin-prizes .prizes-error, .admin-points .points-error, .permission-management .error-message),
+.admin-points :is(.preview-error-lines, .preview-row.error) {
+  background: var(--theme-danger-surface);
+  color: var(--danger-color);
+}
+
+.admin-prize-orders .form-success {
+  color: var(--success-color);
+}
+
+.admin-prize-orders .form-error {
+  color: var(--danger-color);
+}
+
+/* Product administration */
+.admin-prizes .admin-prizes-tabs {
+  background: var(--theme-card-surface-alt);
+}
+
+.admin-prizes .admin-prizes-tabs button {
+  color: var(--dark-purple);
+}
+
+.admin-prizes .admin-prizes-tabs button.active {
+  background: var(--primary-purple);
+  color: var(--white);
+}
+
+.admin-prizes :is(
+  .prizes-metrics > div,
+  .prize-items-panel,
+  .prize-editor-panel,
+  .redemptions-panel,
+  .prize-admin-row
+) {
+  background: var(--theme-card-surface);
+  border-color: var(--theme-border-soft);
+  box-shadow: var(--shadow);
+}
+
+.admin-prizes :is(.prize-admin-row:hover, .prize-admin-row.selected, .prize-admin-row.dragging) {
+  background: var(--theme-card-highlight);
+  border-color: var(--primary-purple);
+  box-shadow: var(--shadow-hover);
+}
+
+.admin-prizes :is(.drag-handle, .inline-copy-button) {
+  color: var(--primary-purple);
+}
+
+.admin-prizes :is(
+  .panel-toolbar h2,
+  .panel-toolbar h3,
+  .prize-editor-panel h2,
+  .prize-editor-form label,
+  .prize-options-editor label,
+  .delivery-type-field,
+  .stock-summary-field span,
+  .option-summary-list span,
+  .pending-image-list span,
+  .redemption-table th
+) {
+  color: var(--dark-purple);
+}
+
+.admin-prizes :is(
+  .admin-prizes-header p,
+  .prizes-metrics span,
+  .panel-title-hint,
+  .prize-row-main > span,
+  .stock-summary-field small,
+  .prize-editor-modal-header p,
+  .pending-image-note,
+  .handled-text,
+  .redemption-subtext,
+  .prize-preview-stats span,
+  .prize-preview-main p
+) {
+  color: var(--text-light);
+}
+
+.admin-prizes :is(.prizes-metrics strong, .stock-summary-field strong, .prize-row-main strong, .prize-preview-title h3, .prize-preview-stats strong) {
+  color: var(--text-dark);
+}
+
+.admin-prizes :is(
+  .stock-summary-field,
+  .prize-options-summary-card,
+  .prize-option-editor-row,
+  .prize-preview-card,
+  .prize-preview-stats > div,
+  .pending-image-list span,
+  .redemption-table th
+) {
+  background: var(--theme-card-surface-alt);
+  border-color: var(--theme-border-soft);
+}
+
+.admin-prizes :is(
+  .prize-options-editor,
+  .option-summary-list span,
+  .prize-option-image-preview,
+  .prize-option-toggle,
+  .prize-preview-options span,
+  .image-admin-item,
+  .image-manager,
+  .redemption-table th,
+  .redemption-table td
+) {
+  border-color: var(--theme-border-soft);
+}
+
+.admin-prizes :is(.option-summary-list span, .prize-option-image-preview, .prize-option-toggle, .prize-preview-options span) {
+  background: var(--theme-input-surface);
+  color: var(--dark-purple);
+}
+
+.admin-prizes :is(.image-admin-actions button, .row-actions button) {
+  background: var(--theme-primary-soft);
+  color: var(--dark-purple);
+}
+
+.admin-prizes .danger-text,
+.admin-prizes .pending-image-list button {
+  color: var(--danger-color) !important;
+}
+
+.admin-prizes :is(.delivery-badge.physical, .delivery-text.physical) {
+  color: var(--primary-purple);
+}
+
+.admin-prizes .delivery-badge.physical {
+  background: var(--theme-primary-soft);
+}
+
+.admin-prizes :is(.delivery-badge.virtual, .delivery-text.virtual) {
+  color: var(--success-color);
+}
+
+.admin-prizes .delivery-badge.virtual {
+  background: var(--theme-success-surface);
+}
+
+.admin-prizes .delivery-type-toggle button {
+  background: var(--theme-input-surface);
+  border-color: var(--theme-border-soft);
+  color: var(--dark-purple);
+}
+
+.admin-prizes .delivery-type-toggle button:hover {
+  border-color: var(--primary-purple);
+  box-shadow: 0 0 0 3px var(--theme-focus-ring);
+}
+
+.admin-prizes .delivery-type-toggle button.active.physical {
+  background: var(--theme-primary-soft);
+  border-color: var(--primary-purple);
+  color: var(--primary-purple);
+  box-shadow: 0 0 0 3px var(--theme-focus-ring);
+}
+
+.admin-prizes .delivery-type-toggle button.active.virtual {
+  background: var(--theme-success-surface);
+  border-color: var(--success-color);
+  color: var(--success-color);
+  box-shadow: none;
+}
+
+.prize-editor-modal-overlay {
+  background: var(--theme-overlay);
+}
+
+.prize-editor-modal,
+.prize-editor-modal-header,
+.prize-editor-modal-footer {
+  background: var(--theme-card-surface);
+}
+
+.prize-editor-modal {
+  box-shadow: 0 28px 80px var(--theme-modal-shadow);
+}
+
+.prize-editor-modal :is(.prize-editor-modal-header, .prize-editor-modal-footer) {
+  border-color: var(--theme-border-soft);
+}
+
+.prize-editor-modal-body {
+  background: var(--theme-card-surface-alt);
+}
+
+/* Point administration */
+.admin-points :is(.points-metrics > div, .points-main, .points-detail, .points-import) {
+  background: var(--theme-card-surface);
+  border-color: var(--theme-border-soft);
+  box-shadow: var(--shadow);
+}
+
+.admin-points :is(
+  .admin-points-header p,
+  .points-metrics span,
+  .section-title-row span,
+  .preview-page-summary,
+  .preview-user-info span,
+  .preview-user.missing .preview-user-info strong,
+  .points-table td span,
+  .detail-placeholder,
+  .detail-header span,
+  .detail-balance span,
+  .transaction-item span,
+  .transaction-item small,
+  .transaction-modal-header span
+) {
+  color: var(--text-light);
+}
+
+.admin-points :is(
+  .points-metrics strong,
+  .section-title-row h2,
+  .preview-summary,
+  .detail-header h2,
+  .detail-balance strong,
+  .adjust-box h3,
+  .transaction-list h3,
+  .transaction-modal-header h2,
+  .transaction-table td,
+  .transaction-filter-form label span,
+  .preview-pagination span,
+  .transaction-modal-footer span
+) {
+  color: var(--text-dark);
+}
+
+.admin-points :is(.points-table th, .transaction-table th) {
+  background: var(--primary-purple);
+  color: var(--white);
+}
+
+.admin-points :is(.points-table td, .transaction-item, .transaction-table td, .import-preview, .transaction-modal-header, .transaction-modal-footer) {
+  border-color: var(--theme-border-soft);
+}
+
+.admin-points :is(.points-table tr.selected, .points-table tr:hover) {
+  background: var(--theme-card-highlight);
+}
+
+.admin-points .points-table tbody tr:focus {
+  outline-color: var(--primary-purple);
+}
+
+.admin-points :is(.detail-header button, .transaction-list-title button, .transaction-modal-header button) {
+  color: var(--primary-purple);
+}
+
+.admin-points :is(.detail-balance, .transaction-filter-form) {
+  background: var(--theme-card-surface-alt);
+}
+
+.admin-points .preview-row {
+  background: var(--theme-card-surface-alt);
+}
+
+.admin-points .preview-user-source {
+  background: var(--theme-primary-soft);
+  color: var(--dark-purple);
+}
+
+.admin-points .preview-user-source.bilibili {
+  background: var(--theme-primary-soft);
+  color: var(--primary-purple);
+}
+
+.admin-points .preview-user-source.local {
+  background: var(--theme-success-surface);
+  color: var(--success-color);
+}
+
+.admin-points .preview-user-source.none {
+  background: var(--theme-card-surface-alt);
+  color: var(--text-light);
+}
+
+.admin-points .preview-user-avatar {
+  background: var(--theme-card-surface);
+  border-color: var(--theme-border-soft);
+}
+
+.admin-points :is(.delta-plus, .delta-plus-cell) {
+  color: var(--success-color) !important;
+}
+
+.admin-points :is(.delta-minus, .delta-minus-cell, .preview-row em) {
+  color: var(--danger-color) !important;
+}
+
+.admin-points .transaction-modal-backdrop {
+  background: var(--theme-overlay);
+}
+
+.admin-points .transaction-modal {
+  background: var(--theme-card-surface);
+  box-shadow: 0 22px 60px var(--theme-modal-shadow);
+}
+
+/* Redemption order administration */
+.admin-prize-orders :is(.admin-order-panel, .admin-order-row, .admin-order-modal-content) {
+  background: var(--theme-card-surface);
+  border-color: var(--theme-border-soft);
+  box-shadow: var(--shadow);
+}
+
+.admin-prize-orders .admin-order-row:hover {
+  border-color: var(--primary-purple);
+  box-shadow: var(--shadow-hover);
+}
+
+.admin-prize-orders .admin-order-modal {
+  background: var(--theme-overlay);
+}
+
+.admin-prize-orders .admin-order-modal-content {
+  box-shadow: 0 18px 50px var(--theme-modal-shadow);
+}
+
+.admin-prize-orders :is(.admin-order-detail-header, .admin-order-item, .admin-order-detail-actions) {
+  border-color: var(--theme-border-soft);
+}
+
+.admin-prize-orders .admin-order-address {
+  background: var(--theme-card-surface-alt);
+  border-color: var(--theme-border-soft);
+}
+
+.admin-prize-orders .admin-order-close {
+  color: var(--text-light);
+}
+
+.admin-prize-orders .prize-checkout-remark textarea {
+  background: var(--theme-input-surface);
+  border-color: var(--theme-border-soft);
+}
+
+/* Permission administration */
+.permission-management .registration-toggle,
+.permission-management :is(.permission-count, .pagination span, .user-info span, .permission-desc, .admin-note, .loading) {
+  color: var(--text-light);
+}
+
+.permission-management .toggle-btn.open {
+  background: var(--success-color);
+  color: var(--white);
+}
+
+.permission-management .toggle-btn.closed {
+  background: var(--danger-color);
+  color: var(--white);
+}
+
+.permission-management .users-table,
+.permission-management .permission-modal {
+  background: var(--theme-card-surface);
+  box-shadow: var(--shadow);
+}
+
+.permission-management .users-table th {
+  background: var(--primary-purple);
+  color: var(--white);
+}
+
+.permission-management .users-table td,
+.permission-management .modal-actions {
+  border-color: var(--theme-border-soft);
+}
+
+.permission-management .users-table tr:hover,
+.permission-management .users-table tr.admin-row {
+  background: var(--theme-card-highlight);
+}
+
+.permission-management .role-badge.admin {
+  background: var(--primary-purple);
+  color: var(--white);
+}
+
+.permission-management .role-badge.premium {
+  background: var(--warning-color);
+  color: var(--white);
+}
+
+.permission-management :is(.role-badge.user, .limit-badge) {
+  background: var(--theme-card-surface-alt);
+  color: var(--text-light);
+}
+
+.permission-management :is(.all-permissions, .role-section h3, .permissions-section h3) {
+  color: var(--primary-purple);
+}
+
+.permission-management .modal-overlay {
+  background: var(--theme-overlay);
+}
+
+.permission-management .permission-modal {
+  box-shadow: 0 20px 60px var(--theme-modal-shadow);
+}
+
+.permission-management :is(.user-info, .role-option, .permission-item) {
+  background: var(--theme-card-surface-alt);
+}
+
+.permission-management :is(.role-option:hover, .permission-item:hover) {
+  background: var(--theme-primary-soft);
+}
+
+.permission-management .role-option.selected {
+  background: var(--theme-primary-soft);
+  border-color: var(--primary-purple);
+}
+
+.permission-management :is(.user-info strong, .role-label, .permission-name) {
+  color: var(--text-dark);
+}
+
+/* Shared semantic status pills */
+:is(.admin-prizes, .admin-prize-orders) :is(.status-pill.active, .status-pill.completed) {
+  background: var(--theme-success-surface);
+  color: var(--success-color);
+}
+
+:is(.admin-prizes, .admin-prize-orders) :is(.status-pill.inactive, .status-pill.cancelled, .status-pill.empty) {
+  background: var(--theme-card-surface-alt);
+  color: var(--text-light);
+}
+
+:is(.admin-prizes, .admin-prize-orders) .status-pill.pending {
+  background: var(--theme-warning-surface);
+  color: var(--warning-color);
+}
+
+.admin-prize-orders .status-pill.mixed {
+  background: var(--theme-primary-soft);
+  color: var(--dark-purple);
+}

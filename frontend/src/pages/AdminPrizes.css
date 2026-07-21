@@ -646,7 +646,6 @@
     minmax(170px, 1.25fr)
     minmax(105px, 0.7fr)
     minmax(125px, 0.78fr)
-    minmax(135px, 0.82fr)
     minmax(220px, 1.35fr)
     auto;
   gap: 0.75rem;

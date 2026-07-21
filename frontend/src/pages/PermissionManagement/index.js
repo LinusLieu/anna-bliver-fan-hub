@@ -1,1 +1,3 @@
-export { default } from './PermissionManagement';
+import PermissionManagement from './PermissionManagement';
+
+export default PermissionManagement;

@@ -1,0 +1,199 @@
+# REST API、权限与 bili-bot 接口
+
+## 通用约定
+
+- 默认基础地址：`http://localhost:5000/api`
+- 受保护接口：`Authorization: Bearer <jwt>`
+- JSON 请求上限由 `REQUEST_BODY_LIMIT` 控制。
+- 成功响应可能直接返回对象，也可能使用 `{ "success": true, "data": ... }`；前端服务层已统一解包商城响应。
+- 错误响应至少包含 `{ "message": "..." }`。
+- `401` 表示登录失效，`403` 表示权限不足，`429` 表示触发限流。
+
+## REST 路由
+
+### 认证与用户
+
+| 方法 | 路径 | 访问 | 说明 |
+| --- | --- | --- | --- |
+| `POST` | `/auth/send-code` | 公开、独立限流 | 启用邮件验证时发送验证码 |
+| `POST` | `/auth/register` | 公开、独立限流 | 注册；密码 10–64 位 |
+| `POST` | `/auth/login` | 公开、独立限流 | 登录并返回 JWT |
+| `GET` | `/auth/profile` | 登录 | 当前用户与积分概览 |
+| `GET` | `/auth/users` | 管理员 | 分页用户列表 |
+| `PUT` | `/auth/users/:id/role` | 管理员 | 更新角色，禁止降级最后一个管理员 |
+
+### 站点配置
+
+| 方法 | 路径 | 访问 | 说明 |
+| --- | --- | --- | --- |
+| `GET` | `/settings/captcha` | 公开 | Captcha 是否启用及公开前端参数 |
+| `GET` | `/settings/registration` | 公开 | 注册开关与邮箱验证状态 |
+| `GET` | `/settings/site` | 公开 | 站点文案、品牌与主题 |
+| `PUT` | `/settings/registration` | `site_config.manage` | 修改注册开关 |
+| `PUT` | `/settings/site` | `site_config.manage` | 事务化保存站点配置 |
+| `POST` | `/settings/site/logo` | `site_config.manage` | 上传 2 MB 以内 PNG/JPG/WebP Logo |
+
+### 歌曲列表
+
+| 方法 | 路径 | 访问 | 说明 |
+| --- | --- | --- | --- |
+| `GET` | `/playlists/songs` | 公开 | 聚合全部历史容器中的歌曲 |
+| `GET` | `/playlists/tags` | 公开 | 标签列表 |
+| `GET` | `/playlists` | 公开兼容 | 旧歌单容器列表 |
+| `GET` | `/playlists/:id` | 公开兼容 | 旧歌单及歌曲 |
+| `POST` | `/playlists/songs` | `playlist.manage` | 新增歌曲并自动初始化内部歌单 |
+| `POST` | `/playlists/songs/batch` | `playlist.manage` | 最多批量新增 500 首 |
+| `PUT` | `/playlists/songs/:id` | `playlist.manage` | 更新歌曲与标签 |
+| `DELETE` | `/playlists/songs/:id` | `playlist.manage` | 删除歌曲 |
+| `POST/PUT/DELETE` | `/playlists/tags...` | `playlist.manage` | 标签维护 |
+
+### 棉花糖
+
+| 方法 | 路径 | 访问 | 说明 |
+| --- | --- | --- | --- |
+| `POST` | `/marshmallows` | 公开、独立限流 | 匿名或登录投递，正文最多 10000 字 |
+| `GET` | `/marshmallows/my` | 登录 | 当前用户认领的内容 |
+| `POST` | `/marshmallows/bind` | 登录 | 使用投递 UUID 认领 |
+| `GET` | `/marshmallows/admin` | `marshmallow.manage` | 管理列表 |
+| `PUT` | `/marshmallows/:id/reply` | `marshmallow.manage` | 回复 |
+| `POST` | `/marshmallows/:id/read` | `marshmallow.manage` | 标记已读 |
+| `POST` | `/marshmallows/delete` | `marshmallow.manage` | 最多批量删除 100 条 |
+
+### 积分
+
+`GET /points/summary` 与 `GET /points/transactions` 只需要登录。`/points/admin/*` 全部要求 `points.manage`，包括账号创建、资料刷新、流水查询、手工调整、CSV 预览/提交/导出和手工结算。
+
+### 商城
+
+- `GET /prizes`、`GET /prizes/:id`：公开商品读取。
+- `/prizes/cart/*`、`/prizes/shipping-addresses/*`、`/prizes/user/*`：登录用户自己的购物车、地址和订单。
+- `POST /prizes/redeem`、`POST /prizes/cart/checkout`：积分事务结账，单行数量 1–99。
+- `/prizes/admin/*`：要求 `prize.manage`，覆盖商品、图片、排序、库存、订单状态和退款。
+
+商品 Base64 图片会在服务端验证 PNG/JPG/WebP 魔数与 2 MB 上限，写入 `backend/uploads/prizes/`，数据库只保存站内 URL。
+
+### 权限
+
+| 方法 | 路径 | 访问 | 说明 |
+| --- | --- | --- | --- |
+| `GET` | `/permissions/types` | 登录 | 可分配权限类型 |
+| `GET` | `/permissions/my` | 登录 | 当前角色与显式权限 |
+| `GET` | `/permissions/users` | 管理员 | 用户及权限 |
+| `GET/PUT` | `/permissions/users/:id` | 管理员 | 查看或更新角色和权限 |
+
+### B站资料与绑定
+
+- `GET /bilibili/info`：读取站点配置 UID 的公开资料。
+- `/bilibili-binding/*`：全部要求登录；创建二维码、轮询、查看绑定、设为主账号和解绑。
+
+## bili-bot WebSocket 接口
+
+### 角色与连接方向
+
+网站后端是 **WebSocket 客户端**，bili-bot 或事件网关是 **WebSocket 服务端**：
+
+```text
+bili-bot / event gateway  <==== WebSocket ====  fan-hub backend
+        sends events                         stores + settles + ACKs
+```
+
+配置 `BOT_WS_URL` 后启用。若同时配置 `BOT_WS_TOKEN`，握手会携带：
+
+```http
+Authorization: Bearer <BOT_WS_TOKEN>
+```
+
+生产环境必须使用 `wss://`、随机 Token 和服务端来源限制。不要把 B站 Cookie 放入事件消息。
+
+### 连接与补偿
+
+连接成功后网站发送：
+
+```json
+{
+  "type": "resume",
+  "settled_before": "2026-07-22T12:00:00.000Z"
+}
+```
+
+事件服务应把该消息视为补偿/重放请求，并重新发送仍可能未被网站确认的稳定事件。网站按 `event_id` 幂等，因此安全重放优于遗漏。
+
+连接关闭后网站从 1 秒开始指数退避，最大 30 秒。Bot 端也应维护未确认队列：收到 `accepted` 或 `duplicate` 才移除；`rejected` 进入人工检查或有上限的重试队列。
+
+### 礼物事件
+
+```json
+{
+  "type": "gift",
+  "event_id": "bili:room-123:gift:opaque-stable-id",
+  "room_id": "123456",
+  "uid": "501066866",
+  "username": "Demo User",
+  "total_coin": 1000,
+  "timestamp": "2026-07-22T20:00:00+08:00"
+}
+```
+
+### SC 事件
+
+```json
+{
+  "type": "super_chat",
+  "event_id": "bili:room-123:sc:opaque-stable-id",
+  "room_id": "123456",
+  "uid": "501066866",
+  "username": "Demo User",
+  "total_coin": 3000,
+  "timestamp": "2026-07-22T20:01:00+08:00"
+}
+```
+
+字段要求：
+
+| 字段 | 要求 |
+| --- | --- |
+| `type` | 当前仅 `gift`、`super_chat` |
+| `event_id` | 来源侧稳定且全局唯一；重发不得生成新值 |
+| `room_id` | 可转为正整数，结算时与 `POINTS_ROOM_ID` 比较 |
+| `uid` | B站 UID |
+| `username` | 可选公开昵称 |
+| `total_coin` | 非负整数币值，由 `POINTS_COIN_PER_POINT` 折算 |
+| `timestamp` | 可解析的事件发生时间，不应使用重发时间 |
+
+### ACK
+
+```json
+{
+  "type": "event_ack",
+  "event_id": "bili:room-123:gift:opaque-stable-id",
+  "status": "accepted",
+  "reason": ""
+}
+```
+
+状态：
+
+- `accepted`：首次持久化成功。
+- `duplicate`：该 `event_id` 已存在，可停止重试。
+- `rejected`：格式、业务或数据库处理失败；`reason` 仅用于诊断，不应包含密钥或完整 Cookie。
+
+ACK 表示事件已进入网站账本，不保证已经折算为积分。房间或起算时间不匹配的事件会在结算阶段被记录为过滤结果。
+
+### 扩展新事件
+
+建议保持现有事件向后兼容，并按以下顺序扩展：
+
+1. 为新类型定义稳定 `event_id`、最小字段和币值语义。
+2. 在 `botEventBridge.handleMessage` 白名单中加入类型。
+3. 在 `bilibili_point_events.event_type` 数据库枚举或新事件表中加入类型。
+4. 明确它是否产生积分；纯弹幕、关注等非积分事件不要硬塞进积分表。
+5. 增加幂等、重复发送、乱序、断线补偿和无 Bot 模式测试。
+
+适合独立扩展的方向：
+
+- `guard` / 舰长事件：定义币值或专属奖励流水。
+- `task_reward`：由可信任务服务签名后发放积分。
+- `danmaku`：进入独立互动流，不进入积分账本。
+- 网站到 Bot 的命令：新建反向命令通道并加入请求 ID、权限、超时和 ACK，不复用当前单向事件格式。
+
+若协议需要多个版本，新增顶层 `schema_version`，旧消息缺失时按版本 `1` 处理；不要改变已有字段含义。

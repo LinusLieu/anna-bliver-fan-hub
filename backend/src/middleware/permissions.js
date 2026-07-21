@@ -16,8 +16,15 @@ async function hasPermission(userId, key) {
 }
 
 const requirePermission = (key) => async (req, res, next) => {
-  if (await hasPermission(req.userId, key)) return next();
-  return res.status(403).json({ message: 'Permission denied' });
+  try {
+    if (await hasPermission(req.userId, key)) {
+      req.grantedPermissions = [...new Set([...(req.grantedPermissions || []), key])];
+      return next();
+    }
+    return res.status(403).json({ message: 'Permission denied' });
+  } catch (error) {
+    return next(error);
+  }
 };
 
 module.exports = { PERMISSIONS, hasPermission, requirePermission };

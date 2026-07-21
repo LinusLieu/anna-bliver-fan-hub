@@ -288,4 +288,9 @@ CREATE TABLE redemptions (
   CONSTRAINT fk_redemption_address FOREIGN KEY (address_id) REFERENCES shipping_addresses(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO settings (setting_key, setting_value) VALUES ('registration_open', 'true');
+INSERT INTO playlists (title, description, created_by)
+VALUES ('网站歌单', '网站唯一歌曲列表', NULL);
+
+INSERT INTO settings (setting_key, setting_value) VALUES
+  ('registration_open', 'true'),
+  ('site_playlist_id', CAST(LAST_INSERT_ID() AS CHAR));

@@ -52,11 +52,11 @@
 .marshmallow-admin-card {
   cursor: pointer;
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
-  background: var(--white);
+  background: var(--theme-card-surface);
 }
 
 .marshmallow-admin-card-unread {
-  background: #fff8e1;
+  background: var(--theme-warning-surface);
 }
 
 .marshmallow-admin-card-selected {
@@ -104,7 +104,7 @@
   flex: 0 0 auto;
   margin-top: 0.15rem;
   border-radius: 4px;
-  background: #e74c3c;
+  background: var(--danger-color);
   color: var(--white);
   font-size: 0.7rem;
   font-weight: 800;
@@ -164,7 +164,7 @@
   margin-bottom: 1rem;
   padding: 1rem;
   border-radius: 8px;
-  background: #f9f9f9;
+  background: var(--theme-card-surface-alt);
   line-height: 1.7;
   white-space: pre-wrap;
   overflow-wrap: anywhere;

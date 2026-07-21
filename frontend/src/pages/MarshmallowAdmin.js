@@ -176,7 +176,7 @@ const MarshmallowAdmin = () => {
               </button>
               <button
                 className="btn"
-                style={{ background: '#e74c3c', color: 'white' }}
+                style={{ background: 'var(--danger-color)', color: 'var(--white)' }}
                 onClick={() => enterMode('delete')}
               >
                 批量删除
@@ -191,7 +191,7 @@ const MarshmallowAdmin = () => {
                 className="btn btn-primary"
                 onClick={handleConfirmAction}
                 disabled={selectedIds.size === 0}
-                style={{ background: mode === 'delete' ? '#e74c3c' : 'var(--primary-purple)' }}
+                style={{ background: mode === 'delete' ? 'var(--danger-color)' : 'var(--primary-purple)' }}
               >
                 {mode === 'delete' ? '确认删除' : '确认导出'}
               </button>
@@ -232,7 +232,7 @@ const MarshmallowAdmin = () => {
               ref={el => cardRefs.current[m.id] = el}
               className={`card marshmallow-admin-card ${!isRead ? 'marshmallow-admin-card-unread' : ''} ${isSelected ? 'marshmallow-admin-card-selected' : ''}`}
               style={{
-                borderLeft: m.reply_content ? '5px solid #27ae60' : '5px solid #e74c3c',
+                borderLeft: m.reply_content ? '5px solid var(--success-color)' : '5px solid var(--danger-color)',
               }}
               onClick={() => toggleExpand(m.id, isRead)}
             >

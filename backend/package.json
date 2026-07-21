@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "description": "API for the Anna BLive Fan Hub showcase project",
+  "author": "Linus_Lieu",
+  "engines": { "node": ">=20" },
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",

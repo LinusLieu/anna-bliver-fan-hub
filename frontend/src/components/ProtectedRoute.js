@@ -7,6 +7,7 @@ function ProtectedRoute({ children, adminOnly = false, requiredPermissions = [] 
   const [hasAccess, setHasAccess] = useState(false);
   const isAuthenticated = authService.isAuthenticated();
   const user = authService.getCurrentUser();
+  const permissionKey = requiredPermissions.join('|');
 
   useEffect(() => {
     const checkAccess = async () => {
@@ -30,11 +31,12 @@ function ProtectedRoute({ children, adminOnly = false, requiredPermissions = [] 
       }
 
       // Check required permissions
-      if (requiredPermissions.length > 0) {
+      const permissionsToCheck = permissionKey ? permissionKey.split('|') : [];
+      if (permissionsToCheck.length > 0) {
         try {
           const userPerms = await permissionService.getMyPermissions();
           // Check if user has any of the required permissions
-          const hasPermission = requiredPermissions.some(perm =>
+          const hasPermission = permissionsToCheck.some(perm =>
             userPerms.permissions?.includes(perm)
           );
           setHasAccess(hasPermission);
@@ -51,7 +53,7 @@ function ProtectedRoute({ children, adminOnly = false, requiredPermissions = [] 
     };
 
     checkAccess();
-  }, [isAuthenticated, user?.role, adminOnly, requiredPermissions]);
+  }, [isAuthenticated, user?.role, adminOnly, permissionKey]);
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;

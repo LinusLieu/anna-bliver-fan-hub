@@ -6,8 +6,14 @@ export const authService = {
     return response.data;
   },
 
-  async register(username, email, password, verificationCode) {
-    const response = await api.post('/auth/register', { username, email, password, verificationCode });
+  async register(username, email, password, verificationCode, captchaVerifyParam) {
+    const response = await api.post('/auth/register', {
+      username,
+      email,
+      password,
+      verificationCode,
+      captchaVerifyParam
+    });
     return response.data;
   },
 
@@ -86,10 +92,20 @@ export const settingsService = {
   async updateSiteConfig(config) {
     const response = await api.put('/settings/site', config);
     return response.data;
+  },
+
+  async uploadNavbarLogo(dataUrl) {
+    const response = await api.post('/settings/site/logo', { dataUrl });
+    return response.data;
   }
 };
 
 export const playlistService = {
+  async getAllSongs() {
+    const response = await api.get('/playlists/songs');
+    return response.data;
+  },
+
   async getAllPlaylists() {
     const response = await api.get('/playlists');
     return response.data;
@@ -100,18 +116,13 @@ export const playlistService = {
     return response.data;
   },
 
-  async createPlaylist(data) {
-    const response = await api.post('/playlists', data);
+  async addSong(songData) {
+    const response = await api.post('/playlists/songs', songData);
     return response.data;
   },
 
-  async addSong(playlistId, songData) {
-    const response = await api.post(`/playlists/${playlistId}/songs`, songData);
-    return response.data;
-  },
-
-  async batchAddSongs(playlistId, songs) {
-    const response = await api.post(`/playlists/${playlistId}/songs/batch`, { songs });
+  async batchAddSongs(songs) {
+    const response = await api.post('/playlists/songs/batch', { songs });
     return response.data;
   },
 

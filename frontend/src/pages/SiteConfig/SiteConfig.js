@@ -4,6 +4,7 @@ import {
   SITE_THEME_COLOR_SECTIONS,
   SITE_THEME_PRESETS
 } from '../../constants/siteTheme';
+import BrandMark from '../../components/BrandMark';
 import { usePageTitle, useSiteSettings } from '../../context/SiteSettingsContext';
 import { settingsService } from '../../services';
 import './SiteConfig.css';
@@ -16,6 +17,22 @@ const PREVIEW_STATUS_ITEMS = [
   { key: 'dangerColor', label: '危险' }
 ];
 
+const BRAND_MODE_OPTIONS = [
+  { value: 'image', label: '仅图片', description: '适合使用横版完整 Logo。' },
+  { value: 'text', label: '仅文字', description: '不显示图片，只使用品牌名称。' },
+  { value: 'icon-text', label: '方形 Logo + 文字', description: '小图标与品牌名称并排显示。' }
+];
+
+const NAVBAR_LOGO_ACCEPT = 'image/png,image/jpeg,image/webp';
+const MAX_NAVBAR_LOGO_BYTES = 2 * 1024 * 1024;
+
+const readFileAsDataUrl = (file) => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(reader.result);
+  reader.onerror = () => reject(new Error('读取 Logo 图片失败'));
+  reader.readAsDataURL(file);
+});
+
 const isPresetActive = (formData, preset) => Object.entries(preset.values)
   .every(([fieldName, value]) => formData[fieldName] === value);
 
@@ -24,6 +41,7 @@ function SiteConfig() {
   const [formData, setFormData] = useState(DEFAULT_FORM);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
@@ -66,6 +84,39 @@ function SiteConfig() {
     }));
     setError('');
     setSuccessMessage('');
+  };
+
+  const handleLogoUpload = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    if (!NAVBAR_LOGO_ACCEPT.split(',').includes(file.type)) {
+      setError('Logo 仅支持 PNG、JPG 和 WebP 图片');
+      return;
+    }
+    if (!file.size || file.size > MAX_NAVBAR_LOGO_BYTES) {
+      setError('Logo 图片大小必须在 2 MB 以内');
+      return;
+    }
+
+    try {
+      setUploadingLogo(true);
+      setError('');
+      setSuccessMessage('');
+      const dataUrl = await readFileAsDataUrl(file);
+      const response = await settingsService.uploadNavbarLogo(dataUrl);
+      if (!response?.url || !/^(\/|https:\/\/)/i.test(response.url)) {
+        throw new Error('上传接口未返回有效的 Logo 地址');
+      }
+      handleChange('navbarLogoUrl', response.url);
+      setSuccessMessage('Logo 已上传并填入，点击“保存配置”后正式生效');
+    } catch (uploadError) {
+      console.error('Failed to upload navbar logo:', uploadError);
+      setError(uploadError.response?.data?.message || uploadError.message || '上传 Logo 失败');
+    } finally {
+      setUploadingLogo(false);
+    }
   };
 
   const handleSave = async () => {
@@ -119,7 +170,7 @@ function SiteConfig() {
               className="btn btn-secondary"
               onClick={() => handleBulkChange(SITE_THEME_PRESETS[0].values)}
             >
-              恢复默认配色
+              恢复原站配色
             </button>
           </div>
 
@@ -154,6 +205,78 @@ function SiteConfig() {
           </div>
         </section>
 
+        <section className="site-config-card site-config-card-full">
+          <div className="site-config-card-heading">
+            <div>
+              <h2>导航品牌</h2>
+              <p>设置左上角显示为完整 Logo、纯文字，或者方形 Logo 与文字的组合。</p>
+            </div>
+          </div>
+
+          <div className="site-config-brand-mode-grid" role="group" aria-label="导航品牌样式">
+            {BRAND_MODE_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`site-config-brand-mode ${formData.navbarBrandMode === option.value ? 'active' : ''}`}
+                aria-pressed={formData.navbarBrandMode === option.value}
+                onClick={() => handleChange('navbarBrandMode', option.value)}
+              >
+                <strong>{option.label}</strong>
+                <span>{option.description}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="site-config-brand-editor">
+            <div className="site-config-brand-fields">
+              {formData.navbarBrandMode !== 'image' && (
+                <label className="site-config-field">
+                  <span>品牌文字</span>
+                  <input
+                    type="text"
+                    maxLength="60"
+                    value={formData.navbarBrandText}
+                    onChange={(e) => handleChange('navbarBrandText', e.target.value)}
+                    placeholder={formData.siteTitle}
+                  />
+                </label>
+              )}
+
+              {formData.navbarBrandMode !== 'text' && (
+                <>
+                  <label className="site-config-field">
+                    <span>Logo 图片地址</span>
+                    <input
+                      type="text"
+                      value={formData.navbarLogoUrl}
+                      onChange={(e) => handleChange('navbarLogoUrl', e.target.value)}
+                      placeholder="/annapiggy-logo.png 或 https://..."
+                    />
+                  </label>
+                  <div className="site-config-logo-upload">
+                    <label className={`site-config-upload-button ${uploadingLogo ? 'disabled' : ''}`}>
+                      {uploadingLogo ? '上传中...' : '从本地上传 Logo'}
+                      <input
+                        type="file"
+                        accept={NAVBAR_LOGO_ACCEPT}
+                        onChange={handleLogoUpload}
+                        disabled={uploadingLogo}
+                      />
+                    </label>
+                    <span>支持 PNG、JPG、WebP，最大 2 MB。组合模式建议上传正方形图片。</span>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="site-config-brand-preview">
+              <span>导航栏预览</span>
+              <BrandMark settings={formData} />
+            </div>
+          </div>
+        </section>
+
         <section className="site-config-card">
           <h2>基础信息</h2>
 
@@ -177,10 +300,6 @@ function SiteConfig() {
             <input type="text" value={formData.creatorDisplayName} onChange={(e) => handleChange('creatorDisplayName', e.target.value)} />
           </label>
 
-          <label className="site-config-field">
-            <span>导航 Logo</span>
-            <input type="text" value={formData.navbarLogoUrl} onChange={(e) => handleChange('navbarLogoUrl', e.target.value)} />
-          </label>
         </section>
 
         <section className="site-config-card">
@@ -269,13 +388,12 @@ function SiteConfig() {
             <div
               className="site-config-preview-navbar"
               style={{
-                background: `linear-gradient(135deg, ${formData.darkColor} 0%, ${formData.backgroundAccentColor} 100%)`,
+                background: formData.surfaceSubtleColor,
                 border: `1px solid ${formData.borderSoftColor}`
               }}
             >
               <div className="site-config-preview-navbar-brand">
-                <div className="site-config-preview-logo" style={{ backgroundColor: formData.primaryColor }} />
-                <strong style={{ color: formData.lightColor }}>{formData.siteTitle}</strong>
+                <BrandMark settings={formData} className="site-config-preview-brand" />
               </div>
               <span style={{ color: formData.textLightColor }}>网站配置</span>
             </div>

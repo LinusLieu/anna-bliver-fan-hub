@@ -1,6 +1,8 @@
 const WebSocket = require('ws');
 const pointsService = require('./pointsService');
 
+const MAX_EVENT_PAYLOAD_BYTES = 64 * 1024;
+
 let socket = null;
 let retryTimer = null;
 let retryAttempt = 0;
@@ -30,7 +32,7 @@ function connect() {
   const url = String(process.env.BOT_WS_URL || '').trim();
   if (!url) return;
   const headers = process.env.BOT_WS_TOKEN ? { Authorization: `Bearer ${process.env.BOT_WS_TOKEN}` } : {};
-  socket = new WebSocket(url, { headers });
+  socket = new WebSocket(url, { headers, maxPayload: MAX_EVENT_PAYLOAD_BYTES });
   socket.on('open', () => {
     retryAttempt = 0;
     socket.send(JSON.stringify({ type: 'resume', settled_before: new Date().toISOString() }));
@@ -59,4 +61,4 @@ function stopBotEventBridge() {
   socket = null;
 }
 
-module.exports = { startBotEventBridge, stopBotEventBridge, handleMessage };
+module.exports = { MAX_EVENT_PAYLOAD_BYTES, startBotEventBridge, stopBotEventBridge, handleMessage };

@@ -17,6 +17,7 @@ function Register() {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const [registrationOpen, setRegistrationOpen] = useState(true);
+  const [emailVerificationEnabled, setEmailVerificationEnabled] = useState(true);
   const [checkingStatus, setCheckingStatus] = useState(true);
   const [sendingCode, setSendingCode] = useState(false);
   const [countdown, setCountdown] = useState(0);
@@ -72,6 +73,7 @@ function Register() {
     try {
       const data = await settingsService.getRegistrationStatus();
       setRegistrationOpen(data.registrationOpen);
+      setEmailVerificationEnabled(data.emailVerificationEnabled !== false);
     } catch (err) {
       console.error('Failed to check registration status');
     } finally {
@@ -105,10 +107,10 @@ function Register() {
     return { valid: true };
   };
 
-  // 验证密码：6-32个字符，至少包含两种字符类型
+  // 验证密码：10-64个字符，至少包含两种字符类型
   const validatePassword = (password) => {
-    if (password.length < 6 || password.length > 32) {
-      return { valid: false, message: '密码长度需要在6-32个字符之间' };
+    if (password.length < 10 || password.length > 64) {
+      return { valid: false, message: '密码长度需要在10-64个字符之间' };
     }
     let typeCount = 0;
     if (/[a-zA-Z]/.test(password)) typeCount++;
@@ -120,8 +122,7 @@ function Register() {
     return { valid: true };
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const submitRegistration = async (captchaVerifyParam) => {
     setError('');
     setSuccess('');
 
@@ -129,45 +130,62 @@ function Register() {
     const usernameResult = validateUsername(formData.username);
     if (!usernameResult.valid) {
       setError(usernameResult.message);
-      return;
+      return false;
     }
 
     // 验证邮箱格式
     if (!validateEmail(formData.email)) {
       setError('请输入有效的邮箱地址');
-      return;
+      return false;
     }
 
     // 验证密码
     const passwordResult = validatePassword(formData.password);
     if (!passwordResult.valid) {
       setError(passwordResult.message);
-      return;
+      return false;
     }
 
     if (formData.password !== formData.confirmPassword) {
       setError('两次输入的密码不一致');
-      return;
+      return false;
     }
 
-    // 验证验证码
-    if (!formData.verificationCode || formData.verificationCode.length !== 6) {
+    if (emailVerificationEnabled && (!formData.verificationCode || formData.verificationCode.length !== 6)) {
       setError('请输入6位邮箱验证码');
-      return;
+      return false;
     }
 
     setLoading(true);
     try {
-      await authService.register(formData.username, formData.email, formData.password, formData.verificationCode);
+      await authService.register(
+        formData.username,
+        formData.email,
+        formData.password,
+        emailVerificationEnabled ? formData.verificationCode : undefined,
+        captchaVerifyParam
+      );
       setSuccess('注册成功！正在跳转到登录页面...');
       setTimeout(() => {
         navigate('/login');
       }, 2000);
+      return true;
     } catch (err) {
-      setError(err.response?.data?.message || '注册失败');
+      const responseData = err.response?.data;
+      if (responseData?.captchaFailed) {
+        if (captchaRef.current) captchaRef.current.refresh();
+        return { captchaResult: false };
+      }
+      setError(responseData?.message || '注册失败');
+      return false;
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (emailVerificationEnabled) submitRegistration();
   };
 
   if (checkingStatus) {
@@ -231,35 +249,37 @@ function Register() {
             </small>
           </div>
 
-          <div className="form-group">
-            <label className="form-label">邮箱验证码</label>
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-              <input
-                type="text"
-                name="verificationCode"
-                className="form-input"
-                value={formData.verificationCode}
-                onChange={handleChange}
-                placeholder="请输入6位验证码"
-                maxLength={6}
-                style={{ flex: 1 }}
-                required
-              />
-              <AliyunCaptcha
-                ref={captchaRef}
-                onSuccess={handleSendCode}
-                buttonText={countdown > 0 ? `${countdown}秒后重试` : '获取验证码'}
-                loadingText="发送中..."
-                loading={sendingCode}
-                disabled={countdown > 0 || !formData.email}
-                type="secondary"
-                style={{ whiteSpace: 'nowrap', minWidth: '120px' }}
-              />
+          {emailVerificationEnabled && (
+            <div className="form-group">
+              <label className="form-label">邮箱验证码</label>
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <input
+                  type="text"
+                  name="verificationCode"
+                  className="form-input"
+                  value={formData.verificationCode}
+                  onChange={handleChange}
+                  placeholder="请输入6位验证码"
+                  maxLength={6}
+                  style={{ flex: 1 }}
+                  required
+                />
+                <AliyunCaptcha
+                  ref={captchaRef}
+                  onSuccess={handleSendCode}
+                  buttonText={countdown > 0 ? `${countdown}秒后重试` : '获取验证码'}
+                  loadingText="发送中..."
+                  loading={sendingCode}
+                  disabled={countdown > 0 || !formData.email}
+                  type="secondary"
+                  style={{ whiteSpace: 'nowrap', minWidth: '120px' }}
+                />
+              </div>
+              <small style={{ color: 'var(--text-light)', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>
+                验证码10分钟内有效
+              </small>
             </div>
-            <small style={{ color: 'var(--text-light)', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>
-              验证码10分钟内有效
-            </small>
-          </div>
+          )}
 
           <div className="form-group">
             <label className="form-label">密码</label>
@@ -269,10 +289,12 @@ function Register() {
               className="form-input"
               value={formData.password}
               onChange={handleChange}
+              minLength={10}
+              maxLength={64}
               required
             />
             <small style={{ color: 'var(--text-light)', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>
-              6-32个字符，需包含字母、数字、特殊符号中的至少两种
+              10-64个字符，需包含字母、数字、特殊符号中的至少两种
             </small>
           </div>
 
@@ -284,6 +306,8 @@ function Register() {
               className="form-input"
               value={formData.confirmPassword}
               onChange={handleChange}
+              minLength={10}
+              maxLength={64}
               required
             />
           </div>
@@ -291,9 +315,21 @@ function Register() {
           {error && <div className="form-error">{error}</div>}
           {success && <div className="form-success">{success}</div>}
 
-          <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={loading}>
-            {loading ? '注册中...' : '注册'}
-          </button>
+          {emailVerificationEnabled ? (
+            <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={loading}>
+              {loading ? '注册中...' : '注册'}
+            </button>
+          ) : (
+            <AliyunCaptcha
+              ref={captchaRef}
+              onSuccess={submitRegistration}
+              buttonText="注册"
+              loadingText="注册中..."
+              loading={loading}
+              type="primary"
+              style={{ width: '100%' }}
+            />
+          )}
         </form>
 
         <p style={{ textAlign: 'center', marginTop: '1rem', color: 'var(--text-light)' }}>

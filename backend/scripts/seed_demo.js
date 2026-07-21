@@ -2,6 +2,7 @@ require('dotenv').config();
 const bcrypt = require('bcryptjs');
 const db = require('../src/config/database');
 const pointsService = require('../src/services/pointsService');
+const { ensureSitePlaylist } = require('../src/services/sitePlaylistService');
 
 async function run() {
   const password = String(process.env.DEMO_ADMIN_PASSWORD || '');
@@ -17,14 +18,11 @@ async function run() {
     );
     const [users] = await connection.query(`SELECT id FROM users WHERE email = 'demo-admin@example.invalid'`);
     const userId = users[0].id || userResult.insertId;
-    const [playlistResult] = await connection.query(
-      `INSERT INTO playlists (title, description, image_url, created_by) VALUES (?, ?, ?, ?)`,
-      ['演示歌单', '纯虚构曲目，用于展示歌单筛选和管理。', '/annapiggy-logo.png', userId]
-    );
+    const playlistId = await ensureSitePlaylist(connection, userId);
     await connection.query(
       `INSERT INTO songs (playlist_id, title, artist, duration, song_order) VALUES
        (?, '星光练习曲', 'Demo Singer', '03:18', 1), (?, '晚风留言', 'Demo Band', '04:02', 2)`,
-      [playlistResult.insertId, playlistResult.insertId]
+      [playlistId, playlistId]
     );
     await connection.query(
       `INSERT INTO prizes (name, description, cost, image_url, stock, delivery_type) VALUES

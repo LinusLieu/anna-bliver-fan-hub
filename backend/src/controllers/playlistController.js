@@ -1,433 +1,318 @@
 const db = require('../config/database');
-const { hasPermission, PERMISSIONS } = require('../middleware/permissions');
+const { ensureSitePlaylist } = require('../services/sitePlaylistService');
+const { positiveInt, stringValue } = require('../utils/validation');
+
+const DEFAULT_TAG_COLOR = '#6c5ce7';
+const SPONSOR_TAG_NAME = '冠名';
+
+async function runInTransaction(work) {
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+    const result = await work(connection);
+    await connection.commit();
+    return result;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+function normalizeSongInput(song = {}) {
+  return {
+    title: stringValue(song.title, { field: 'Title', max: 255 }),
+    artist: stringValue(song.artist, { field: 'Artist', max: 255 }),
+    duration: stringValue(song.duration, { field: 'Duration', max: 20 }) || null,
+    note: stringValue(song.note, { field: 'Sponsor note', max: 2000 }) || null,
+    songOrder: Number.isFinite(Number(song.song_order)) ? Number(song.song_order) : 0,
+    tags: Array.isArray(song.tags) ? song.tags : []
+  };
+}
+
+function normalizeTagNames(tags, note) {
+  const names = (Array.isArray(tags) ? tags : [])
+    .map((tag) => typeof tag === 'string' ? tag : tag?.name)
+    .map((name) => stringValue(name, { field: 'Tag name', max: 50 }))
+    .filter((name) => name && name !== SPONSOR_TAG_NAME);
+  if (note) names.push(SPONSOR_TAG_NAME);
+  const uniqueNames = [...new Set(names)];
+  if (uniqueNames.length > 30) {
+    const error = new Error('A song can contain at most 30 tags');
+    error.status = 400;
+    throw error;
+  }
+  return uniqueNames;
+}
+
+async function replaceSongTags(connection, songId, tags, note) {
+  const tagNames = normalizeTagNames(tags, note);
+  await connection.query('DELETE FROM song_tags WHERE song_id = ?', [songId]);
+  if (!tagNames.length) return;
+
+  for (const name of tagNames) {
+    await connection.query(
+      'INSERT IGNORE INTO tags (name, color) VALUES (?, ?)',
+      [name, DEFAULT_TAG_COLOR]
+    );
+  }
+  const [tagRows] = await connection.query(
+    'SELECT id FROM tags WHERE name IN (?)',
+    [tagNames]
+  );
+  for (const tag of tagRows) {
+    await connection.query(
+      'INSERT IGNORE INTO song_tags (song_id, tag_id) VALUES (?, ?)',
+      [songId, tag.id]
+    );
+  }
+}
+
+async function getCurrentSongTags(connection, songId) {
+  const [rows] = await connection.query(
+    `SELECT t.name
+     FROM tags t
+     INNER JOIN song_tags st ON st.tag_id = t.id
+     WHERE st.song_id = ?`,
+    [songId]
+  );
+  return rows.map((row) => row.name);
+}
+
+async function insertSong(connection, playlistId, input) {
+  const [result] = await connection.query(
+    `INSERT INTO songs (playlist_id, title, artist, duration, song_order, note)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [playlistId, input.title, input.artist, input.duration, input.songOrder, input.note]
+  );
+  await replaceSongTags(connection, result.insertId, input.tags, input.note);
+  return result.insertId;
+}
+
+async function loadSongs(queryable, whereClause = '', params = []) {
+  const [rows] = await queryable.query(
+    `SELECT s.id, s.playlist_id, s.title, s.artist, s.duration, s.note, s.song_order,
+            s.created_at, p.title AS playlist_title,
+            t.id AS tag_id, t.name AS tag_name, t.color AS tag_color
+     FROM songs s
+     INNER JOIN playlists p ON p.id = s.playlist_id
+     LEFT JOIN song_tags st ON st.song_id = s.id
+     LEFT JOIN tags t ON t.id = st.tag_id
+     ${whereClause}
+     ORDER BY s.title ASC, s.id ASC, t.id ASC`,
+    params
+  );
+
+  const songsById = new Map();
+  for (const row of rows) {
+    if (!songsById.has(row.id)) {
+      songsById.set(row.id, {
+        id: row.id,
+        playlist_id: row.playlist_id,
+        title: row.title,
+        artist: row.artist,
+        duration: row.duration,
+        note: row.note,
+        song_order: row.song_order,
+        created_at: row.created_at,
+        playlistTitle: row.playlist_title,
+        tags: []
+      });
+    }
+    if (row.tag_id) {
+      songsById.get(row.id).tags.push({
+        id: row.tag_id,
+        name: row.tag_name,
+        color: row.tag_color
+      });
+    }
+  }
+  return [...songsById.values()];
+}
+
+function sendControllerError(res, error, label) {
+  console.error(`${label} error:`, error);
+  const status = error.statusCode || error.status || 500;
+  return res.status(status).json({
+    message: status < 500 ? error.message : 'Server error'
+  });
+}
 
 exports.getAllPlaylists = async (req, res) => {
   try {
     const [playlists] = await db.query(
       'SELECT p.*, u.username as creator_name FROM playlists p LEFT JOIN users u ON p.created_by = u.id ORDER BY p.created_at DESC'
     );
-
     res.json(playlists);
   } catch (error) {
-    console.error('Get playlists error:', error);
-    res.status(500).json({ message: 'Server error' });
+    sendControllerError(res, error, 'Get playlists');
+  }
+};
+
+exports.getAllSongs = async (req, res) => {
+  try {
+    res.json(await loadSongs(db));
+  } catch (error) {
+    sendControllerError(res, error, 'Get songs');
   }
 };
 
 exports.getPlaylistById = async (req, res) => {
   try {
-    const { id } = req.params;
-
+    const playlistId = positiveInt(req.params.id, { field: 'Playlist ID' });
     const [playlists] = await db.query(
       'SELECT p.*, u.username as creator_name FROM playlists p LEFT JOIN users u ON p.created_by = u.id WHERE p.id = ?',
-      [id]
+      [playlistId]
     );
-
-    if (playlists.length === 0) {
-      return res.status(404).json({ message: 'Playlist not found' });
-    }
-
-    // Get songs for this playlist with tags
-    const [songs] = await db.query(
-      `SELECT
-        s.*,
-        GROUP_CONCAT(CONCAT(t.name, ':', t.color)) as tags_info
-      FROM songs s
-      LEFT JOIN song_tags st ON s.id = st.song_id
-      LEFT JOIN tags t ON st.tag_id = t.id
-      WHERE s.playlist_id = ?
-      GROUP BY s.id
-      ORDER BY s.song_order ASC`,
-      [id]
-    );
-
-    // Process tags_info into array
-    const songsWithTags = songs.map(song => {
-      const tags = song.tags_info ? song.tags_info.split(',').map(tagStr => {
-        const [name, color] = tagStr.split(':');
-        return { name, color };
-      }) : [];
-      const { tags_info, ...songData } = song;
-      return { ...songData, tags };
-    });
-
-    res.json({
-      ...playlists[0],
-      songs: songsWithTags
-    });
+    if (!playlists.length) return res.status(404).json({ message: 'Playlist not found' });
+    const songs = await loadSongs(db, 'WHERE s.playlist_id = ?', [playlistId]);
+    return res.json({ ...playlists[0], songs });
   } catch (error) {
-    console.error('Get playlist error:', error);
-    res.status(500).json({ message: 'Server error' });
+    return sendControllerError(res, error, 'Get playlist');
   }
 };
 
-exports.createPlaylist = async (req, res) => {
+exports.addSong = async (req, res) => {
+  const input = normalizeSongInput(req.body);
+  if (!input.title || !input.artist) {
+    return res.status(400).json({ message: 'Title and artist are required' });
+  }
+
   try {
-    const { title, description, image_url } = req.body;
-
-    if (!title) {
-      return res.status(400).json({ message: 'Title is required' });
-    }
-
-    const [result] = await db.query(
-      'INSERT INTO playlists (title, description, image_url, created_by) VALUES (?, ?, ?, ?)',
-      [title, description, image_url, req.userId]
-    );
-
-    res.status(201).json({
-      message: 'Playlist created successfully',
-      playlistId: result.insertId
+    const result = await runInTransaction(async (connection) => {
+      const playlistId = await ensureSitePlaylist(connection, req.userId);
+      const songId = await insertSong(connection, playlistId, input);
+      return { playlistId, songId };
     });
+    return res.status(201).json({ message: 'Song added successfully', ...result });
   } catch (error) {
-    console.error('Create playlist error:', error);
-    res.status(500).json({ message: 'Server error' });
+    return sendControllerError(res, error, 'Add song');
   }
 };
 
-exports.addSongToPlaylist = async (req, res) => {
-  try {
-    const { playlistId } = req.params;
-    const { title, artist, duration, song_order, tags, note } = req.body;
-
-    // Check permissions
-    const [playlist] = await db.query('SELECT created_by FROM playlists WHERE id = ?', [playlistId]);
-    if (playlist.length === 0) {
-      return res.status(404).json({ message: 'Playlist not found' });
-    }
-
-    if (req.userRole !== 'admin' && playlist[0].created_by !== req.userId) {
-      return res.status(403).json({ message: 'You do not have permission to modify this playlist' });
-    }
-
-    if (!title || !artist) {
-      return res.status(400).json({ message: 'Title and artist are required' });
-    }
-
-    const [result] = await db.query(
-      'INSERT INTO songs (playlist_id, title, artist, duration, song_order, note) VALUES (?, ?, ?, ?, ?, ?)',
-      [playlistId, title, artist, duration, song_order || 0, note || null]
-    );
-
-    const newSongId = result.insertId;
-
-    // Add tags if provided
-    if (tags && tags.length > 0) {
-      const tagNames = tags.map(t => t.name);
-      if (tagNames.length > 0) {
-        const [dbTags] = await db.query('SELECT id, name FROM tags WHERE name IN (?)', [tagNames]);
-
-        for (const dbTag of dbTags) {
-          await db.query(
-            'INSERT IGNORE INTO song_tags (song_id, tag_id) VALUES (?, ?)',
-            [newSongId, dbTag.id]
-          );
-        }
-      }
-    }
-
-    // Automatic tag linkage: If note is present, ensure '冠歌' (id: 6) is added
-    if (note && note.trim() !== '') {
-      await db.query(
-        'INSERT IGNORE INTO song_tags (song_id, tag_id) VALUES (?, ?)',
-        [newSongId, 6]
-      );
-    }
-
-    res.status(201).json({
-      message: 'Song added successfully',
-      songId: newSongId
-    });
-  } catch (error) {
-    console.error('Add song error:', error);
-    res.status(500).json({ message: 'Server error' });
+exports.batchAddSongs = async (req, res) => {
+  if (!Array.isArray(req.body.songs)) {
+    return res.status(400).json({ message: 'Songs must be an array' });
   }
-};
+  if (req.body.songs.length > 500) return res.status(400).json({ message: 'A batch can contain at most 500 songs' });
+  const songs = req.body.songs.map(normalizeSongInput).filter((song) => song.title && song.artist);
+  if (!songs.length) {
+    return res.status(400).json({ message: 'At least one valid song is required' });
+  }
 
-exports.batchAddSongsToPlaylist = async (req, res) => {
-  let connection;
   try {
-    const { playlistId } = req.params;
-
-    // Check permissions
-    const [playlist] = await db.query('SELECT created_by FROM playlists WHERE id = ?', [playlistId]);
-    if (playlist.length === 0) {
-      return res.status(404).json({ message: 'Playlist not found' });
-    }
-
-    if (req.userRole !== 'admin' && playlist[0].created_by !== req.userId) {
-      return res.status(403).json({ message: 'You do not have permission to modify this playlist' });
-    }
-
-    connection = await db.getConnection();
-    await connection.beginTransaction();
-
-    const { songs } = req.body;
-
-    if (!Array.isArray(songs)) {
-      return res.status(400).json({ message: 'Songs must be an array' });
-    }
-
-    let addedCount = 0;
-
-    for (const song of songs) {
-      const { title, artist, duration, song_order, tags, note } = song;
-
-      if (!title || !artist) continue; // Skip invalid rows
-
-      const [result] = await connection.query(
-        'INSERT INTO songs (playlist_id, title, artist, duration, song_order, note) VALUES (?, ?, ?, ?, ?, ?)',
-        [playlistId, title, artist, duration, song_order || 0, note || null]
-      );
-
-      const newSongId = result.insertId;
-      addedCount++;
-
-      // Add tags if provided
-      if (tags && tags.length > 0) {
-        // tags can be array of strings or objects {name, color}
-        // Normalize to names
-        const tagNames = tags.map(t => typeof t === 'string' ? t : t.name).filter(Boolean);
-
-        if (tagNames.length > 0) {
-          // Find existing tags
-          const [dbTags] = await connection.query('SELECT id, name FROM tags WHERE name IN (?)', [tagNames]);
-          const existingTagNames = dbTags.map(t => t.name);
-
-          // Create missing tags
-          const missingTags = tagNames.filter(name => !existingTagNames.includes(name));
-          for (const name of missingTags) {
-             // Simple creation for missing tags, default color
-             await connection.query('INSERT IGNORE INTO tags (name, color) VALUES (?, ?)', [name, '#6c5ce7']);
-          }
-
-          // Re-fetch all tags to get IDs
-          const [allDbTags] = await connection.query('SELECT id, name FROM tags WHERE name IN (?)', [tagNames]);
-
-          for (const dbTag of allDbTags) {
-            await connection.query(
-              'INSERT IGNORE INTO song_tags (song_id, tag_id) VALUES (?, ?)',
-              [newSongId, dbTag.id]
-            );
-          }
-        }
-      }
-
-      // Automatic tag linkage: If note is present, ensure '冠歌' (id: 6) is added
-      if (note && note.trim() !== '') {
-        await connection.query(
-          'INSERT IGNORE INTO song_tags (song_id, tag_id) VALUES (?, ?)',
-          [newSongId, 6]
-        );
-      }
-    }
-
-    await connection.commit();
-    res.status(201).json({
-      message: `Successfully added ${addedCount} songs`,
-      count: addedCount
+    const result = await runInTransaction(async (connection) => {
+      const playlistId = await ensureSitePlaylist(connection, req.userId);
+      for (const song of songs) await insertSong(connection, playlistId, song);
+      return { playlistId, count: songs.length };
     });
+    return res.status(201).json({ message: `Successfully added ${result.count} songs`, ...result });
   } catch (error) {
-    if (connection) await connection.rollback();
-    console.error('Batch add songs error:', error);
-    res.status(500).json({ message: 'Server error' });
-  } finally {
-    if (connection) connection.release();
+    return sendControllerError(res, error, 'Batch add songs');
   }
 };
 
 exports.updateSong = async (req, res) => {
+  const input = normalizeSongInput(req.body);
+  const songId = positiveInt(req.params.id, { field: 'Song ID' });
+  if (!input.title || !input.artist) {
+    return res.status(400).json({ message: 'Title and artist are required' });
+  }
+
   try {
-    const { id } = req.params;
-    const { title, artist, duration, tags, note } = req.body;
-
-    // Check permissions
-    const [song] = await db.query('SELECT playlist_id FROM songs WHERE id = ?', [id]);
-    if (song.length === 0) {
-      return res.status(404).json({ message: 'Song not found' });
-    }
-
-    const playlistId = song[0].playlist_id;
-    const [playlist] = await db.query('SELECT created_by FROM playlists WHERE id = ?', [playlistId]);
-
-    if (req.userRole !== 'admin' && (!playlist[0] || playlist[0].created_by !== req.userId)) {
-      return res.status(403).json({ message: 'You do not have permission to modify this playlist' });
-    }
-
-    if (!title || !artist) {
-      return res.status(400).json({ message: 'Title and artist are required' });
-    }
-
-    // Update song details
-    await db.query(
-      'UPDATE songs SET title = ?, artist = ?, duration = ?, note = ? WHERE id = ?',
-      [title, artist, duration, note || null, id]
-    );
-
-    // Update tags if provided
-    if (tags) {
-      // Remove existing tags
-      await db.query('DELETE FROM song_tags WHERE song_id = ?', [id]);
-
-      // Add new tags
-      if (tags.length > 0) {
-        // Get tag IDs
-        const tagNames = tags.map(t => t.name);
-        if (tagNames.length > 0) {
-          const [dbTags] = await db.query('SELECT id, name FROM tags WHERE name IN (?)', [tagNames]);
-
-          for (const dbTag of dbTags) {
-            await db.query(
-              'INSERT IGNORE INTO song_tags (song_id, tag_id) VALUES (?, ?)',
-              [id, dbTag.id]
-            );
-          }
-        }
+    await runInTransaction(async (connection) => {
+      const [songs] = await connection.query('SELECT id FROM songs WHERE id = ? FOR UPDATE', [songId]);
+      if (!songs.length) {
+        const error = new Error('Song not found');
+        error.statusCode = 404;
+        throw error;
       }
-    }
-
-    // Automatic tag linkage: If note is present, ensure '冠歌' (id: 6) is added
-    if (note && note.trim() !== '') {
-      await db.query(
-        'INSERT IGNORE INTO song_tags (song_id, tag_id) VALUES (?, ?)',
-        [id, 6]
+      if (!Array.isArray(req.body.tags)) input.tags = await getCurrentSongTags(connection, songId);
+      await connection.query(
+        'UPDATE songs SET title = ?, artist = ?, duration = ?, note = ? WHERE id = ?',
+        [input.title, input.artist, input.duration, input.note, songId]
       );
-    }
-
-    res.json({ message: 'Song updated successfully' });
+      await replaceSongTags(connection, songId, input.tags, input.note);
+    });
+    return res.json({ message: 'Song updated successfully' });
   } catch (error) {
-    console.error('Update song error:', error);
-    res.status(500).json({ message: 'Server error' });
+    return sendControllerError(res, error, 'Update song');
   }
 };
 
 exports.deleteSong = async (req, res) => {
   try {
-    const { id } = req.params;
-
-    // Check permissions
-    const [song] = await db.query('SELECT playlist_id FROM songs WHERE id = ?', [id]);
-    if (song.length === 0) {
-      return res.status(404).json({ message: 'Song not found' });
-    }
-
-    const playlistId = song[0].playlist_id;
-    const [playlist] = await db.query('SELECT created_by FROM playlists WHERE id = ?', [playlistId]);
-
-    if (req.userRole !== 'admin' && (!playlist[0] || playlist[0].created_by !== req.userId)) {
-      return res.status(403).json({ message: 'You do not have permission to modify this playlist' });
-    }
-
-    // Delete associated tags first (if no cascade delete)
-    await db.query('DELETE FROM song_tags WHERE song_id = ?', [id]);
-
-    // Delete the song
-    await db.query('DELETE FROM songs WHERE id = ?', [id]);
-
-    res.json({ message: 'Song deleted successfully' });
+    const songId = positiveInt(req.params.id, { field: 'Song ID' });
+    await runInTransaction(async (connection) => {
+      const [result] = await connection.query('DELETE FROM songs WHERE id = ?', [songId]);
+      if (!result.affectedRows) {
+        const error = new Error('Song not found');
+        error.statusCode = 404;
+        throw error;
+      }
+    });
+    return res.json({ message: 'Song deleted successfully' });
   } catch (error) {
-    console.error('Delete song error:', error);
-    res.status(500).json({ message: 'Server error' });
+    return sendControllerError(res, error, 'Delete song');
   }
 };
 
 exports.getAllTags = async (req, res) => {
   try {
-    const [tags] = await db.query('SELECT * FROM tags');
+    const [tags] = await db.query('SELECT * FROM tags ORDER BY name ASC');
     res.json(tags);
   } catch (error) {
-    console.error('Get tags error:', error);
-    res.status(500).json({ message: 'Server error' });
+    sendControllerError(res, error, 'Get tags');
   }
 };
 
 exports.createTag = async (req, res) => {
+  const name = stringValue(req.body.name, { field: 'Tag name', max: 50 });
+  const color = stringValue(req.body.color || DEFAULT_TAG_COLOR, { field: 'Tag color', max: 20 });
+  if (!name) return res.status(400).json({ message: 'Tag name is required' });
+  if (!/^#[0-9a-f]{6}$/i.test(color)) return res.status(400).json({ message: 'Tag color must be a six-digit hex color' });
   try {
-    const { name, color } = req.body;
-
-    if (req.userRole !== 'admin') {
-      const canEdit = await hasPermission(req.userId, PERMISSIONS.PLAYLIST_EDIT_SINGLE) ||
-                      await hasPermission(req.userId, PERMISSIONS.PLAYLIST_EDIT_BATCH);
-      if (!canEdit) {
-        return res.status(403).json({ message: 'Permission denied' });
-      }
-    }
-
-    if (!name) {
-      return res.status(400).json({ message: 'Tag name is required' });
-    }
-
     await db.query(
       'INSERT INTO tags (name, color) VALUES (?, ?)',
-      [name, color || '#6c5ce7']
+      [name, color]
     );
-
     const [newTag] = await db.query('SELECT * FROM tags WHERE name = ?', [name]);
-
-    res.status(201).json(newTag[0]);
+    return res.status(201).json(newTag[0]);
   } catch (error) {
-    if (error.code === 'ER_DUP_ENTRY') {
-      return res.status(400).json({ message: 'Tag already exists' });
-    }
-    console.error('Create tag error:', error);
-    res.status(500).json({ message: 'Server error' });
+    if (error.code === 'ER_DUP_ENTRY') return res.status(400).json({ message: 'Tag already exists' });
+    return sendControllerError(res, error, 'Create tag');
   }
 };
 
 exports.updateTag = async (req, res) => {
+  const name = stringValue(req.body.name, { field: 'Tag name', max: 50 });
+  const color = stringValue(req.body.color || DEFAULT_TAG_COLOR, { field: 'Tag color', max: 20 });
+  if (!name) return res.status(400).json({ message: 'Tag name is required' });
+  if (!/^#[0-9a-f]{6}$/i.test(color)) return res.status(400).json({ message: 'Tag color must be a six-digit hex color' });
   try {
-    const { id } = req.params;
-    const { name, color } = req.body;
-
-    if (req.userRole !== 'admin') {
-      return res.status(403).json({ message: 'Permission denied' });
-    }
-
-    if (!name) {
-      return res.status(400).json({ message: 'Tag name is required' });
-    }
-
     await db.query(
       'UPDATE tags SET name = ?, color = ? WHERE id = ?',
-      [name, color || '#6c5ce7', id]
+      [name, color, positiveInt(req.params.id, { field: 'Tag ID' })]
     );
-
-    const [updatedTag] = await db.query('SELECT * FROM tags WHERE id = ?', [id]);
-
-    if (updatedTag.length === 0) {
-      return res.status(404).json({ message: 'Tag not found' });
-    }
-
-    res.json(updatedTag[0]);
+    const [updatedTag] = await db.query('SELECT * FROM tags WHERE id = ?', [req.params.id]);
+    if (!updatedTag.length) return res.status(404).json({ message: 'Tag not found' });
+    return res.json(updatedTag[0]);
   } catch (error) {
-    if (error.code === 'ER_DUP_ENTRY') {
-      return res.status(400).json({ message: 'Tag name already exists' });
-    }
-    console.error('Update tag error:', error);
-    res.status(500).json({ message: 'Server error' });
+    if (error.code === 'ER_DUP_ENTRY') return res.status(400).json({ message: 'Tag name already exists' });
+    return sendControllerError(res, error, 'Update tag');
   }
 };
 
 exports.deleteTag = async (req, res) => {
   try {
-    const { id } = req.params;
-
-    if (req.userRole !== 'admin') {
-      return res.status(403).json({ message: 'Permission denied' });
-    }
-
-    // Delete associated song_tags first (if no cascade delete)
-    await db.query('DELETE FROM song_tags WHERE tag_id = ?', [id]);
-
-    // Delete the tag
-    const [result] = await db.query('DELETE FROM tags WHERE id = ?', [id]);
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: 'Tag not found' });
-    }
-
-    res.json({ message: 'Tag deleted successfully' });
+    const tagId = positiveInt(req.params.id, { field: 'Tag ID' });
+    const [result] = await db.query('DELETE FROM tags WHERE id = ?', [tagId]);
+    if (!result.affectedRows) return res.status(404).json({ message: 'Tag not found' });
+    return res.json({ message: 'Tag deleted successfully' });
   } catch (error) {
-    console.error('Delete tag error:', error);
-    res.status(500).json({ message: 'Server error' });
+    return sendControllerError(res, error, 'Delete tag');
   }
 };
+
+exports.__test__ = { normalizeSongInput, normalizeTagNames, loadSongs };

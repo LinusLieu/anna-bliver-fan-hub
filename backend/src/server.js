@@ -4,6 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
+const { assertSafeRuntimeConfig, createCorsOptions, resolveTrustProxy } = require('./config/runtimeConfig');
 
 const authRoutes = require('./routes/auth');
 const playlistRoutes = require('./routes/playlists');
@@ -19,20 +20,26 @@ const { startBotEventBridge } = require('./services/botEventBridge');
 
 const app = express();
 const PORT = Number(process.env.PORT || 5000);
-const REQUEST_BODY_LIMIT = process.env.REQUEST_BODY_LIMIT || '10mb';
+const REQUEST_BODY_LIMIT = process.env.REQUEST_BODY_LIMIT || '4mb';
 
-app.set('trust proxy', Number(process.env.TRUST_PROXY || 1));
+app.set('trust proxy', resolveTrustProxy());
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-app.use(cors({ origin: process.env.CORS_ORIGIN || true, credentials: true }));
+app.use(cors(createCorsOptions()));
 app.use(express.json({ limit: REQUEST_BODY_LIMIT }));
 app.use(express.urlencoded({ extended: true, limit: REQUEST_BODY_LIMIT }));
 app.use('/uploads/prizes', express.static(path.join(__dirname, '..', 'uploads', 'prizes')));
+app.use('/uploads/branding', express.static(path.join(__dirname, '..', 'uploads', 'branding')));
 
-const apiLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 2000, standardHeaders: true, legacyHeaders: false });
-const authLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false });
+const rateLimitHandler = (req, res) => res.status(429).json({ message: '请求过于频繁，请稍后再试' });
+const apiLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 1000, standardHeaders: true, legacyHeaders: false, handler: rateLimitHandler });
+const authLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false, handler: rateLimitHandler });
+const verificationLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false, handler: rateLimitHandler });
+const publicWriteLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false, handler: rateLimitHandler });
 app.use('/api', apiLimiter);
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
+app.use('/api/auth/send-code', verificationLimiter);
+app.use('/api/marshmallows', (req, res, next) => req.method === 'POST' && req.path === '/' ? publicWriteLimiter(req, res, next) : next());
 
 app.use('/api/auth', authRoutes);
 app.use('/api/playlists', playlistRoutes);
@@ -47,11 +54,16 @@ app.use('/api/points', pointsRoutes);
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 app.use((err, req, res, next) => {
   if (err?.type === 'entity.too.large') return res.status(413).json({ message: 'Request body too large' });
-  console.error(err);
-  return res.status(500).json({ message: 'Internal server error' });
+  if (err?.type === 'entity.parse.failed') return res.status(400).json({ message: 'Invalid JSON request body' });
+  const status = Number(err?.status);
+  if (!(status >= 400 && status < 500)) console.error(err);
+  return res.status(status >= 400 && status < 600 ? status : 500).json({
+    message: status >= 400 && status < 500 ? err.message : 'Internal server error'
+  });
 });
 
 async function bootstrap() {
+  assertSafeRuntimeConfig();
   await pointsService.ensurePointsSchema();
   await pointsService.settleBilibiliPoints();
   pointsService.scheduleDailySettlement();

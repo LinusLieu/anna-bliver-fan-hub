@@ -468,7 +468,11 @@ async function refreshAccountProfiles(uids = [], { refreshAll = false } = {}) {
   return { requested_count: targets.length, updated_count: updated, failed_count: targets.length - updated };
 }
 
-function escapeCsv(value) { const text = String(value ?? ''); return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text; }
+function escapeCsv(value) {
+  let text = String(value ?? '');
+  if (/^[\s\t]*[=+\-@]/.test(text)) text = `'${text}`;
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
 async function exportAccountsCsv(search = '') {
   const result = await listAdminAccounts({ page: 1, limit: 10000, search });
   return [['bilibili_uid', 'bilibili_uname', 'points', 'username', 'email'], ...result.accounts.map((row) => [row.bilibili_uid, row.bilibili_uname, row.points, row.username, row.email])].map((row) => row.map(escapeCsv).join(',')).join('\n');
@@ -489,8 +493,9 @@ async function ingestBilibiliPointEvent(event) {
   const uid = toUid(event.uid);
   const roomId = toUid(event.room_id);
   const totalCoin = toInt(event.total_coin, -1);
-  const eventAt = new Date(event.timestamp || event.event_at || Date.now());
-  if (!eventId || !uid || !roomId || totalCoin < 0 || Number.isNaN(eventAt.getTime())) throw new Error('Invalid event payload');
+  const eventTimestamp = event.timestamp || event.event_at;
+  const eventAt = new Date(eventTimestamp);
+  if (!eventId || eventId.length > 255 || !uid || !roomId || totalCoin < 0 || !eventTimestamp || Number.isNaN(eventAt.getTime())) throw new Error('Invalid event payload');
   if (!['gift', 'super_chat'].includes(event.type)) throw new Error('Unsupported event type');
   const [result] = await db.query(
     `INSERT IGNORE INTO bilibili_point_events
@@ -576,5 +581,5 @@ module.exports = {
   mergeAllFrozenPoints, previewImport, commitImport, exportAccountsCsv, exportTransactionsCsv,
   claimPointAccountForUser, setPrimaryBilibiliAccount, releasePointAccountForUser,
   ingestBilibiliPointEvent, scheduleDailySettlement,
-  __test__: { buildResolvedImportUser, normalizeBilibiliFace }
+  __test__: { buildResolvedImportUser, escapeCsv, normalizeBilibiliFace }
 };
