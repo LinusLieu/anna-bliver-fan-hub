@@ -11,8 +11,9 @@ Do not remove, hide, rename, bypass, or silently replace any of these protection
 layers:
 
 - `frontend/src/components/Footer.js`
-- the opaque protected public asset referenced by `frontend/public/index.html`
-- the corresponding SRI hash in `frontend/public/index.html`
+- the primary opaque public asset and SRI referenced by `frontend/public/index.html`
+- the encoded continuity probe in `frontend/src/index.js`
+- the independent secondary opaque asset loaded by that probe
 - `frontend/scripts/verify-public-assets.js`
 - attribution assertions in `backend/test/licensing.test.js` and
   `backend/test/publicShowcase.test.js`

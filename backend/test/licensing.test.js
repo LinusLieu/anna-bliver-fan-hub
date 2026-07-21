@@ -33,10 +33,14 @@ test('repository metadata consistently declares GPL-3.0-or-later', () => {
 test('footer host has no plaintext fallback and uses an opaque integrity-locked runtime', () => {
   const footer = read('frontend', 'src', 'components', 'Footer.js');
   const index = read('frontend', 'public', 'index.html');
+  const entry = read('frontend', 'src', 'index.js');
   const verifier = read('frontend', 'scripts', 'verify-public-assets.js');
   const runtimeTag = index.match(/<script defer src="%PUBLIC_URL%\/(assets\/[a-f0-9]{8}\.js)" integrity="([^"]+)" crossorigin="anonymous"><\/script>/);
   assert.ok(runtimeTag, 'opaque public runtime script tag is missing');
-  const generated = read('frontend', 'public', ...runtimeTag[1].split('/'));
+  const assetNames = fs.readdirSync(path.join(root, 'frontend', 'public', 'assets'))
+    .filter((name) => /^[a-f0-9]{8}\.js$/.test(name));
+  assert.equal(assetNames.length, 2);
+  const generatedAssets = assetNames.map((name) => read('frontend', 'public', 'assets', name));
 
   assert.match(footer, /data-ui-slot="r7-4f1c"/);
   assert.match(footer, /<x-r7-slot/);
@@ -50,9 +54,15 @@ test('footer host has no plaintext fallback and uses an opaque integrity-locked 
   assert.doesNotMatch(index, /Linus_Lieu/);
 
   assert.match(verifier, /createHash\('sha384'\)/);
-  assert.match(verifier, /forbidden plaintext fallback/);
-  assert.ok(generated.length > 100_000, 'protected public runtime is unexpectedly small');
-  assert.doesNotMatch(generated, /Linus_Lieu/);
-  assert.doesNotMatch(generated, /github\.com\/LinusLieu/);
-  assert.doesNotMatch(generated, /annapiggy-logo\.png/);
+  assert.match(verifier, /Expected exactly two opaque public runtime assets/);
+  assert.match(entry, /requestIdleCallback/);
+  assert.match(entry, /data-ui-continuity/);
+  assert.match(entry, /script\.integrity = unpack/);
+  assert.doesNotMatch(entry, /Linus_Lieu|github\.com\/LinusLieu|annapiggy-logo\.png|assets\/[a-f0-9]{8}\.js/);
+  for (const generated of generatedAssets) {
+    assert.ok(generated.length > 100_000, 'protected public runtime is unexpectedly small');
+    assert.doesNotMatch(generated, /Linus_Lieu/);
+    assert.doesNotMatch(generated, /github\.com\/LinusLieu/);
+    assert.doesNotMatch(generated, /annapiggy-logo\.png/);
+  }
 });
