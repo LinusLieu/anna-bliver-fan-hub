@@ -30,35 +30,29 @@ test('repository metadata consistently declares GPL-3.0-or-later', () => {
   assert.match(readme, /NOTICE/);
 });
 
-test('footer attribution has fallback, closed shadow DOM and self-healing guard', () => {
+test('footer host has no plaintext fallback and uses an opaque integrity-locked runtime', () => {
   const footer = read('frontend', 'src', 'components', 'Footer.js');
   const index = read('frontend', 'public', 'index.html');
-  const guardSource = read('frontend', 'scripts', 'attribution-guard.source.js');
-  const generator = read('frontend', 'scripts', 'build-attribution-guard.js');
-  const generated = read('frontend', 'public', 'attribution-guard.js');
-  const generatedPayload = generated.slice(generated.indexOf('*/') + 2);
+  const verifier = read('frontend', 'scripts', 'verify-public-assets.js');
+  const runtimeTag = index.match(/<script defer src="%PUBLIC_URL%\/(assets\/[a-f0-9]{8}\.js)" integrity="([^"]+)" crossorigin="anonymous"><\/script>/);
+  assert.ok(runtimeTag, 'opaque public runtime script tag is missing');
+  const generated = read('frontend', 'public', ...runtimeTag[1].split('/'));
 
-  assert.match(footer, /data-legal-notice="anna-attribution-v1"/);
-  assert.match(footer, /aria-label="© 2026 Linus_Lieu"/);
-  assert.match(footer, /<anna-project-attribution/);
-  assert.match(footer, /© 2026/);
-  assert.match(footer, />Linus_Lieu<\/a>/);
-  assert.match(footer, /https:\/\/github\.com\/LinusLieu/);
-  assert.match(index, /attribution-guard\.js/);
+  assert.match(footer, /data-ui-slot="r7-4f1c"/);
+  assert.match(footer, /<x-r7-slot/);
+  assert.match(footer, /data-bilibili-uid=/);
+  assert.doesNotMatch(footer, /© 2026|Linus_Lieu|github\.com\/LinusLieu|annapiggy-logo\.png/);
+  assert.doesNotMatch(footer, /site-footer-fallback/);
 
-  assert.match(guardSource, /attachShadow\(\{ mode: 'closed' \}\)/);
-  assert.match(guardSource, /new MutationObserver\(scheduleCheck\)/);
-  assert.match(guardSource, /ensureAttribution/);
-  assert.match(guardSource, /enforceImportantStyle/);
-  assert.match(guardSource, /© 2026 Linus_Lieu/);
+  assert.match(index, /assets\/[a-f0-9]{8}\.js/);
+  assert.match(index, /integrity="sha384-[A-Za-z0-9+/=]+"/);
+  assert.match(index, /crossorigin="anonymous"/);
+  assert.doesNotMatch(index, /Linus_Lieu/);
 
-  assert.match(generator, /controlFlowFlattening: true/);
-  assert.match(generator, /deadCodeInjection: true/);
-  assert.match(generator, /selfDefending: true/);
-  assert.match(generator, /stringArrayEncoding: \['rc4'\]/);
-  assert.match(generated, /generated file/);
-  assert.ok(generatedPayload.length > 50_000, 'generated guard is unexpectedly small');
-  assert.doesNotMatch(generatedPayload, /Linus_Lieu/);
-  assert.doesNotMatch(generatedPayload, /github\.com\/LinusLieu/);
-  assert.doesNotMatch(generatedPayload, /annapiggy-logo\.png/);
+  assert.match(verifier, /createHash\('sha384'\)/);
+  assert.match(verifier, /forbidden plaintext fallback/);
+  assert.ok(generated.length > 100_000, 'protected public runtime is unexpectedly small');
+  assert.doesNotMatch(generated, /Linus_Lieu/);
+  assert.doesNotMatch(generated, /github\.com\/LinusLieu/);
+  assert.doesNotMatch(generated, /annapiggy-logo\.png/);
 });

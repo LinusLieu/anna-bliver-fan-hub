@@ -4699,8 +4699,7 @@ textarea.form-input {
   color: inherit;
 }
 
-.site-footer-attribution,
-.site-footer-fallback {
+.site-footer-slot {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -4725,7 +4724,6 @@ textarea.form-input {
   .home-feature-grid { gap: 1.25rem; }
   .home-feature-card { width: min(300px, calc(100vw - 3rem)); }
   .site-footer-inner { flex-wrap: wrap; gap: .55rem; }
-  .site-footer-attribution,
-  .site-footer-fallback { gap: .55rem; }
+  .site-footer-slot { gap: .55rem; }
   .site-footer-brand img { height: 15px; }
 }

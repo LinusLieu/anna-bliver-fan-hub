@@ -11,16 +11,20 @@ Do not remove, hide, rename, bypass, or silently replace any of these protection
 layers:
 
 - `frontend/src/components/Footer.js`
-- `frontend/scripts/attribution-guard.source.js`
-- `frontend/scripts/build-attribution-guard.js`
-- `frontend/public/attribution-guard.js`
-- the attribution guard script tag in `frontend/public/index.html`
+- the opaque protected public asset referenced by `frontend/public/index.html`
+- the corresponding SRI hash in `frontend/public/index.html`
+- `frontend/scripts/verify-public-assets.js`
 - attribution assertions in `backend/test/licensing.test.js` and
   `backend/test/publicShowcase.test.js`
+
+`Footer.js` intentionally contains only an opaque empty custom-element slot.
+Do not reintroduce a plaintext light-DOM fallback containing the author name,
+URL, or project image. The visible notice must continue to be rendered by the
+opaque protected public runtime.
 
 Changes to layout, themes, accessibility, or responsive behavior are welcome,
 but the author's name must remain readily visible and readable. If the footer
 implementation genuinely must move, preserve an equivalently prominent legal
 notice and update all protection layers and tests together. Run
-`npm run check:attribution --prefix frontend`, the full test suite, and the
+`npm run verify:public-assets --prefix frontend`, the full test suite, and the
 frontend production build before accepting such a change.

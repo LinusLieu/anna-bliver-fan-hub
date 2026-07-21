@@ -20,15 +20,14 @@
     "read-excel-file": "^5.8.6"
   },
   "scripts": {
-    "protect:attribution": "node scripts/build-attribution-guard.js",
-    "check:attribution": "node scripts/build-attribution-guard.js --check",
-    "prestart": "npm run protect:attribution",
+    "verify:public-assets": "node scripts/verify-public-assets.js",
+    "prestart": "npm run verify:public-assets",
     "start": "react-scripts start",
-    "prebuild": "npm run protect:attribution",
+    "prebuild": "npm run verify:public-assets",
     "build": "react-scripts build",
-    "pretest": "npm run check:attribution",
+    "pretest": "npm run verify:public-assets",
     "test": "react-scripts test",
-    "pretest:ci": "npm run check:attribution",
+    "pretest:ci": "npm run verify:public-assets",
     "test:ci": "react-scripts test --watchAll=false --runInBand",
     "eject": "react-scripts eject"
   },
@@ -50,7 +49,6 @@
     ]
   },
   "devDependencies": {
-    "javascript-obfuscator": "^5.5.0",
     "react-scripts": "5.0.1"
   },
   "overrides": {
