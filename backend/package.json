@@ -13,7 +13,7 @@
     "seed:demo": "node scripts/seed_demo.js",
     "check": "node --check src/server.js"
   },
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "dependencies": {
     "@alicloud/captcha20230305": "^1.1.4",
     "@alicloud/openapi-client": "^0.4.15",

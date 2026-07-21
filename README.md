@@ -231,6 +231,12 @@ GitHub Actions 会在 push 和 pull request 时执行后端测试、前端测试
   </tr>
 </table>
 
-## License
+## License 与作者署名
 
-[MIT](LICENSE) © 2026 [Linus_Lieu](https://github.com/LinusLieu)
+本项目采用 [GNU GPL v3 或更高版本](LICENSE) 开源。任何人都可以在 GPL
+条款下使用、研究、修改和分发代码；分发修改版时同样需要提供对应源码并
+保留许可证声明。
+
+网站页脚中的 `© 2026 Linus_Lieu` 是依据 GPLv3 第 7(b) 条指定的合理作者
+署名。修改版可以调整页脚样式，但不得删除、遮挡或冒充该署名；完整要求见
+[NOTICE](NOTICE)。

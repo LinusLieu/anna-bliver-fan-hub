@@ -1,5 +1,9 @@
 # Contributing
 
+> 本项目采用 GPL-3.0-or-later。提交代码即表示你同意贡献内容按该协议发布。
+> 网站页脚的作者署名属于 [NOTICE](NOTICE) 指定的 GPLv3 第 7(b) 条合理法律
+> 声明；重构或调整样式时必须保留 `© 2026 Linus_Lieu` 及作者链接。
+
 感谢参与 Anna BLive Fan Hub。提交应保持公开版边界、可独立运行和可审查性。
 
 ## 开发准备

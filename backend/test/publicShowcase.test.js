@@ -198,6 +198,8 @@ test('footer keeps fixed attribution and safely degrades without UID', () => {
   assert.match(source, /noopener noreferrer/);
   assert.match(source, /referrerPolicy="no-referrer"/);
   assert.match(source, /bilibiliUid \?/);
+  assert.match(source, /anna-project-attribution/);
+  assert.match(source, /data-legal-notice="anna-attribution-v1"/);
 });
 
 test('QR binding isolates sessions and never returns or stores login secrets', () => {

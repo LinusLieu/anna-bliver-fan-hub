@@ -4,7 +4,7 @@
   "private": true,
   "description": "Open-source Bilibili live community hub with songs, marshmallows, points, rewards and optional bot integration",
   "author": "Linus_Lieu",
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "engines": {
     "node": ">=20"
   },
