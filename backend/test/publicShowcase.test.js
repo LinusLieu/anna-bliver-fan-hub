@@ -203,6 +203,19 @@ test('footer keeps an opaque protected slot without a plaintext fallback', () =>
   assert.doesNotMatch(entry, /© 2026|Linus_Lieu|github\.com\/LinusLieu|annapiggy-logo\.png/);
 });
 
+test('footer renders configured filing records without empty placeholders', () => {
+  const source = read('frontend', 'src', 'components', 'Footer.js');
+  const styles = read('frontend', 'src', 'styles', 'App.css');
+
+  assert.match(source, /siteSettings\.icpText\?\.trim\(\)/);
+  assert.match(source, /siteSettings\.publicSecurityText\?\.trim\(\)/);
+  assert.match(source, /\{\(icpText \|\| publicSecurityText\) && \(/);
+  assert.match(source, /https:\/\/beian\.miit\.gov\.cn\//);
+  assert.match(source, /https:\/\/beian\.mps\.gov\.cn\//);
+  assert.match(styles, /\.site-footer-records\s*\{/);
+  assert.doesNotMatch(source, /未填写.*备案/);
+});
+
 test('QR binding isolates sessions and never returns or stores login secrets', () => {
   const source = read('backend', 'src', 'controllers', 'bilibiliBindingController.js');
   assert.match(source, /session\.userId !== req\.userId/);

@@ -4689,9 +4689,10 @@ textarea.form-input {
   min-height: 38px;
   margin: 0 auto;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: .8rem;
+  gap: .35rem;
   font-size: .82rem;
 }
 
@@ -4704,6 +4705,31 @@ textarea.form-input {
   align-items: center;
   justify-content: center;
   gap: .8rem;
+}
+
+.site-footer-records {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: .35rem 1rem;
+  min-width: 0;
+  color: var(--text-light);
+  font-size: .76rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.site-footer-records a {
+  overflow-wrap: anywhere;
+  text-decoration: none;
+  transition: color .2s ease;
+}
+
+.site-footer-records a:hover,
+.site-footer-records a:focus-visible {
+  color: var(--primary-purple);
+  text-decoration: underline;
 }
 
 .site-footer-brand {
@@ -4726,4 +4752,5 @@ textarea.form-input {
   .site-footer-inner { flex-wrap: wrap; gap: .55rem; }
   .site-footer-slot { gap: .55rem; }
   .site-footer-brand img { height: 15px; }
+  .site-footer-records { flex-direction: column; gap: .2rem; }
 }
